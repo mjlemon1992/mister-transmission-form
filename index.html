@@ -47,7 +47,6 @@
   .success-card h2 { font-size: 22px; font-weight: 600; color: #2a7a2a; margin-bottom: 10px; }
   .success-card p { font-size: 15px; color: #555; }
   .hidden { display: none; }
-  .pac-container { border-radius: 10px; border: 1px solid #ddd; box-shadow: 0 4px 12px rgba(0,0,0,0.1); font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
   @media (max-width: 600px) { .form-wrap { padding: 1.5rem 1.25rem; } .field-grid.two, .field-grid.three, .field-grid.four { grid-template-columns: 1fr 1fr; } }
 </style>
 </head>
@@ -114,19 +113,19 @@
 <div class="field-grid" style="grid-template-columns:1fr">
   <div class="field" id="f-address">
     <label for="address">Street address *</label>
-    <input type="text" id="address" placeholder="Start typing your address..." autocomplete="off">
+    <input type="text" id="address" placeholder="123 Main Street" autocomplete="street-address">
     <span class="error-msg">Please enter your address</span>
   </div>
 </div>
 <div class="field-grid two">
   <div class="field" id="f-city">
     <label for="city">City / suburb *</label>
-    <input type="text" id="city" placeholder="Auto-filled" autocomplete="off">
+    <input type="text" id="city" placeholder="Springfield" autocomplete="address-level2">
     <span class="error-msg">Please enter your city</span>
   </div>
   <div class="field" id="f-postcode">
     <label for="postcode">Postcode *</label>
-    <input type="text" id="postcode" placeholder="Auto-filled" autocomplete="off">
+    <input type="text" id="postcode" placeholder="A1A 1A1" autocomplete="postal-code">
     <span class="error-msg">Please enter your postcode</span>
   </div>
 </div>
@@ -237,30 +236,6 @@
 <script>
 var BACKEND = "https://mister-transmission-backend-production.up.railway.app";
 var currentType = "individual";
-var autocomplete;
-
-function initAutocomplete() {
-  autocomplete = new google.maps.places.Autocomplete(
-    document.getElementById("address"),
-    { types: ["address"] }
-  );
-  autocomplete.addListener("place_changed", function() {
-    var place = autocomplete.getPlace();
-    var components = place.address_components;
-    if (!components) return;
-    var street_number = "", route = "", city = "", postcode = "";
-    components.forEach(function(c) {
-      var t = c.types[0];
-      if (t === "street_number") street_number = c.long_name;
-      if (t === "route") route = c.long_name;
-      if (t === "locality") city = c.long_name;
-      if (t === "postal_code") postcode = c.long_name;
-    });
-    document.getElementById("address").value = (street_number + " " + route).trim();
-    document.getElementById("city").value = city;
-    document.getElementById("postcode").value = postcode;
-  });
-}
 
 function setType(type) {
   currentType = type;
@@ -387,8 +362,6 @@ function resetForm() {
   document.getElementById("success-card").classList.remove("show");
 }
 </script>
-
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBHzoORtnG6OG3_5ok_imUZYWdDEMZLwJg&libraries=places&callback=initAutocomplete" async defer></script>
 
 </body>
 </html>
