@@ -13,9 +13,16 @@
   .shop-header img { height: 80px; display: block; margin: 0 auto 12px; }
   .shop-header p { font-size: 14px; color: #888; }
   .section-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: #aaa; margin: 0 0 14px; }
+  .type-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 2rem; }
+  .type-btn { border: 2px solid #ddd; border-radius: 12px; padding: 16px; text-align: center; cursor: pointer; background: #fff; transition: all 0.15s; }
+  .type-btn.active { border-color: #E07020; background: #fff8f0; }
+  .type-btn h3 { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 4px; }
+  .type-btn p { font-size: 13px; color: #888; }
+  .type-btn.active h3 { color: #E07020; }
   .field-grid { display: grid; gap: 14px; margin-bottom: 14px; }
   .field-grid.two { grid-template-columns: 1fr 1fr; }
   .field-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+  .field-grid.four { grid-template-columns: 1fr 1fr 1fr 1fr; }
   .field { display: flex; flex-direction: column; gap: 6px; }
   .field label { font-size: 13px; color: #555; font-weight: 500; }
   .field input, .field select { font-size: 16px; padding: 0 14px; height: 52px; border-radius: 10px; border: 1px solid #ddd; background: #fff; color: #111; width: 100%; -webkit-appearance: none; appearance: none; transition: border-color 0.15s; }
@@ -39,7 +46,9 @@
   .success-card img { height: 64px; display: block; margin: 0 auto 20px; }
   .success-card h2 { font-size: 22px; font-weight: 600; color: #2a7a2a; margin-bottom: 10px; }
   .success-card p { font-size: 15px; color: #555; }
-  @media (max-width: 600px) { .form-wrap { padding: 1.5rem 1.25rem; } .field-grid.two, .field-grid.three { grid-template-columns: 1fr; } }
+  .hidden { display: none; }
+  .pac-container { border-radius: 10px; border: 1px solid #ddd; box-shadow: 0 4px 12px rgba(0,0,0,0.1); font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+  @media (max-width: 600px) { .form-wrap { padding: 1.5rem 1.25rem; } .field-grid.two, .field-grid.three, .field-grid.four { grid-template-columns: 1fr 1fr; } }
 </style>
 </head>
 <body>
@@ -50,77 +59,143 @@
   </div>
 
   <div id="main-form">
-    <p class="section-label">Personal information</p>
-    <div class="field-grid two">
-      <div class="field" id="f-firstname">
-        <label for="firstname">First name *</label>
-        <input type="text" id="firstname" placeholder="John" autocomplete="given-name">
-        <span class="error-msg">Please enter your first name</span>
+    <p class="section-label">Customer type</p>
+    <div class="type-toggle">
+      <div class="type-btn active" id="btn-individual" onclick="setType('individual')">
+        <h3>Individual</h3>
+        <p>Personal vehicle owner</p>
       </div>
-      <div class="field" id="f-lastname">
-        <label for="lastname">Last name *</label>
-        <input type="text" id="lastname" placeholder="Smith" autocomplete="family-name">
-        <span class="error-msg">Please enter your last name</span>
-      </div>
-    </div>
-    <div class="field-grid" style="grid-template-columns:1fr">
-      <div class="field" id="f-address">
-        <label for="address">Street address *</label>
-        <input type="text" id="address" placeholder="123 Main Street" autocomplete="street-address">
-        <span class="error-msg">Please enter your address</span>
-      </div>
-    </div>
-    <div class="field-grid two">
-      <div class="field" id="f-city">
-        <label for="city">City / suburb *</label>
-        <input type="text" id="city" placeholder="Springfield" autocomplete="address-level2">
-        <span class="error-msg">Please enter your city</span>
-      </div>
-      <div class="field" id="f-postcode">
-        <label for="postcode">Postcode *</label>
-        <input type="text" id="postcode" placeholder="A1A 1A1" autocomplete="postal-code">
-        <span class="error-msg">Please enter your postcode</span>
-      </div>
-    </div>
-    <div class="field-grid two">
-      <div class="field" id="f-phone">
-        <label for="phone">Contact number *</label>
-        <input type="tel" id="phone" placeholder="(555) 000-0000" autocomplete="tel" inputmode="tel">
-        <span class="error-msg">Please enter your phone number</span>
-      </div>
-      <div class="field" id="f-email">
-        <label for="email">Email address *</label>
-        <input type="email" id="email" placeholder="john@example.com" autocomplete="email" inputmode="email">
-        <span class="error-msg">Please enter a valid email address</span>
+      <div class="type-btn" id="btn-fleet" onclick="setType('fleet')">
+        <h3>Fleet</h3>
+        <p>Business / company vehicles</p>
       </div>
     </div>
 
 ```
-<hr class="divider">
-<p class="section-label">Vehicle details</p>
-<div class="field-grid three">
-  <div class="field" id="f-year">
-    <label for="year">Year *</label>
-    <input type="text" id="year" placeholder="2019" inputmode="numeric" maxlength="4">
-    <span class="error-msg">Please enter the vehicle year</span>
+<div id="individual-fields">
+  <p class="section-label">Personal information</p>
+  <div class="field-grid two">
+    <div class="field" id="f-firstname">
+      <label for="firstname">First name *</label>
+      <input type="text" id="firstname" placeholder="John" autocomplete="given-name">
+      <span class="error-msg">Please enter your first name</span>
+    </div>
+    <div class="field" id="f-lastname">
+      <label for="lastname">Last name *</label>
+      <input type="text" id="lastname" placeholder="Smith" autocomplete="family-name">
+      <span class="error-msg">Please enter your last name</span>
+    </div>
   </div>
-  <div class="field" id="f-make">
-    <label for="make">Make *</label>
-    <input type="text" id="make" placeholder="Toyota">
-    <span class="error-msg">Please enter the make</span>
+</div>
+
+<div id="fleet-fields" class="hidden">
+  <p class="section-label">Company information</p>
+  <div class="field-grid" style="grid-template-columns:1fr">
+    <div class="field" id="f-companyname">
+      <label for="companyname">Company name *</label>
+      <input type="text" id="companyname" placeholder="Acme Corp">
+      <span class="error-msg">Please enter the company name</span>
+    </div>
   </div>
-  <div class="field" id="f-model">
-    <label for="model">Model *</label>
-    <input type="text" id="model" placeholder="Camry">
-    <span class="error-msg">Please enter the model</span>
+  <div class="field-grid two">
+    <div class="field" id="f-firstname-fleet">
+      <label for="firstname-fleet">Contact first name *</label>
+      <input type="text" id="firstname-fleet" placeholder="John" autocomplete="given-name">
+      <span class="error-msg">Please enter first name</span>
+    </div>
+    <div class="field" id="f-lastname-fleet">
+      <label for="lastname-fleet">Contact last name *</label>
+      <input type="text" id="lastname-fleet" placeholder="Smith" autocomplete="family-name">
+      <span class="error-msg">Please enter last name</span>
+    </div>
+  </div>
+</div>
+
+<div class="field-grid" style="grid-template-columns:1fr">
+  <div class="field" id="f-address">
+    <label for="address">Street address *</label>
+    <input type="text" id="address" placeholder="Start typing your address..." autocomplete="off">
+    <span class="error-msg">Please enter your address</span>
+  </div>
+</div>
+<div class="field-grid two">
+  <div class="field" id="f-city">
+    <label for="city">City / suburb *</label>
+    <input type="text" id="city" placeholder="Auto-filled" autocomplete="off">
+    <span class="error-msg">Please enter your city</span>
+  </div>
+  <div class="field" id="f-postcode">
+    <label for="postcode">Postcode *</label>
+    <input type="text" id="postcode" placeholder="Auto-filled" autocomplete="off">
+    <span class="error-msg">Please enter your postcode</span>
+  </div>
+</div>
+<div class="field-grid two">
+  <div class="field" id="f-phone">
+    <label for="phone">Contact number *</label>
+    <input type="tel" id="phone" placeholder="(555) 000-0000" autocomplete="tel" inputmode="tel">
+    <span class="error-msg">Please enter your phone number</span>
+  </div>
+  <div class="field" id="f-email">
+    <label for="email">Email address *</label>
+    <input type="email" id="email" placeholder="john@example.com" autocomplete="email" inputmode="email">
+    <span class="error-msg">Please enter a valid email address</span>
   </div>
 </div>
 
 <hr class="divider">
-<p class="section-label">How did you hear about us?</p>
-<div class="field-grid" style="grid-template-columns:1fr">
+<p class="section-label">Vehicle details</p>
+<div class="field-grid four">
+  <div class="field" id="f-year">
+    <label for="year">Year *</label>
+    <input type="text" id="year" placeholder="2019" inputmode="numeric" maxlength="4">
+    <span class="error-msg">Required</span>
+  </div>
+  <div class="field" id="f-make">
+    <label for="make">Make *</label>
+    <input type="text" id="make" placeholder="Toyota">
+    <span class="error-msg">Required</span>
+  </div>
+  <div class="field" id="f-model">
+    <label for="model">Model *</label>
+    <input type="text" id="model" placeholder="Camry">
+    <span class="error-msg">Required</span>
+  </div>
+  <div class="field" id="f-color">
+    <label for="color">Colour *</label>
+    <select id="color">
+      <option value="">Select</option>
+      <option value="White">White</option>
+      <option value="Silver">Silver</option>
+      <option value="Gray">Gray</option>
+      <option value="Black">Black</option>
+      <option value="Blue">Blue</option>
+      <option value="Red">Red</option>
+      <option value="Brown">Brown</option>
+      <option value="Burgundy">Burgundy</option>
+      <option value="Tan">Tan</option>
+      <option value="Gold">Gold</option>
+      <option value="Green">Green</option>
+      <option value="Yellow">Yellow</option>
+      <option value="Orange">Orange</option>
+      <option value="Pink">Pink</option>
+      <option value="Purple">Purple</option>
+      <option value="Other">Other</option>
+    </select>
+    <span class="error-msg">Required</span>
+  </div>
+</div>
+<div class="field-grid two">
+  <div class="field" id="f-vsize">
+    <label for="vsize">Vehicle size *</label>
+    <select id="vsize">
+      <option value="LightDuty">Light duty (car / SUV)</option>
+      <option value="HeavyDuty">Heavy duty (truck / commercial)</option>
+      <option value="Other">Other</option>
+    </select>
+  </div>
   <div class="field" id="f-source">
-    <label for="source">Please select *</label>
+    <label for="source">How did you hear about us? *</label>
     <select id="source">
       <option value="">Select an option</option>
       <option value="google">Google search</option>
@@ -161,28 +236,72 @@
 
 <script>
 var BACKEND = "https://mister-transmission-backend-production.up.railway.app";
+var currentType = "individual";
+var autocomplete;
+
+function initAutocomplete() {
+  autocomplete = new google.maps.places.Autocomplete(
+    document.getElementById("address"),
+    { types: ["address"] }
+  );
+  autocomplete.addListener("place_changed", function() {
+    var place = autocomplete.getPlace();
+    var components = place.address_components;
+    if (!components) return;
+    var street_number = "", route = "", city = "", postcode = "";
+    components.forEach(function(c) {
+      var t = c.types[0];
+      if (t === "street_number") street_number = c.long_name;
+      if (t === "route") route = c.long_name;
+      if (t === "locality") city = c.long_name;
+      if (t === "postal_code") postcode = c.long_name;
+    });
+    document.getElementById("address").value = (street_number + " " + route).trim();
+    document.getElementById("city").value = city;
+    document.getElementById("postcode").value = postcode;
+  });
+}
+
+function setType(type) {
+  currentType = type;
+  document.getElementById("btn-individual").classList.toggle("active", type === "individual");
+  document.getElementById("btn-fleet").classList.toggle("active", type === "fleet");
+  document.getElementById("individual-fields").classList.toggle("hidden", type !== "individual");
+  document.getElementById("fleet-fields").classList.toggle("hidden", type !== "fleet");
+}
 
 function validate() {
-  var rules = [
-    ["f-firstname","firstname",function(v){return v.trim().length>0;}],
-    ["f-lastname","lastname",function(v){return v.trim().length>0;}],
-    ["f-address","address",function(v){return v.trim().length>0;}],
-    ["f-city","city",function(v){return v.trim().length>0;}],
-    ["f-postcode","postcode",function(v){return v.trim().length>0;}],
-    ["f-phone","phone",function(v){return v.trim().length>0;}],
-    ["f-email","email",function(v){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);}],
-    ["f-year","year",function(v){return /^\d{4}$/.test(v.trim());}],
-    ["f-make","make",function(v){return v.trim().length>0;}],
-    ["f-model","model",function(v){return v.trim().length>0;}],
-    ["f-source","source",function(v){return v!=="";}]
-  ];
-  var ok=true;
-  rules.forEach(function(r){
-    var val=document.getElementById(r[1]).value;
-    var wrap=document.getElementById(r[0]);
-    if(!r[2](val)){wrap.classList.add("invalid");ok=false;}
-    else{wrap.classList.remove("invalid");}
-  });
+  var ok = true;
+  function check(wrapperId, inputId, fn) {
+    var el = document.getElementById(inputId);
+    var wrap = document.getElementById(wrapperId);
+    if (!wrap || !el) return;
+    if (!fn(el.value)) { wrap.classList.add("invalid"); ok = false; }
+    else { wrap.classList.remove("invalid"); }
+  }
+  function notEmpty(v) { return v.trim().length > 0; }
+  function validEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+  function validYear(v) { return /^\d{4}$/.test(v.trim()); }
+  function selected(v) { return v !== ""; }
+
+  if (currentType === "individual") {
+    check("f-firstname", "firstname", notEmpty);
+    check("f-lastname", "lastname", notEmpty);
+  } else {
+    check("f-companyname", "companyname", notEmpty);
+    check("f-firstname-fleet", "firstname-fleet", notEmpty);
+    check("f-lastname-fleet", "lastname-fleet", notEmpty);
+  }
+  check("f-address", "address", notEmpty);
+  check("f-city", "city", notEmpty);
+  check("f-postcode", "postcode", notEmpty);
+  check("f-phone", "phone", notEmpty);
+  check("f-email", "email", validEmail);
+  check("f-year", "year", validYear);
+  check("f-make", "make", notEmpty);
+  check("f-model", "model", notEmpty);
+  check("f-color", "color", selected);
+  check("f-source", "source", selected);
   return ok;
 }
 
@@ -194,9 +313,20 @@ function submitForm() {
   bar.className = "status-bar sending";
   bar.textContent = "Sending to Shopmonkey...";
 
+  var firstName = currentType === "individual"
+    ? document.getElementById("firstname").value.trim()
+    : document.getElementById("firstname-fleet").value.trim();
+  var lastName = currentType === "individual"
+    ? document.getElementById("lastname").value.trim()
+    : document.getElementById("lastname-fleet").value.trim();
+  var companyName = currentType === "fleet"
+    ? document.getElementById("companyname").value.trim() : "";
+
   var payload = {
-    firstName: document.getElementById("firstname").value.trim(),
-    lastName: document.getElementById("lastname").value.trim(),
+    customerType: currentType,
+    firstName: firstName,
+    lastName: lastName,
+    companyName: companyName,
     address: document.getElementById("address").value.trim(),
     city: document.getElementById("city").value.trim(),
     postcode: document.getElementById("postcode").value.trim(),
@@ -205,6 +335,8 @@ function submitForm() {
     year: document.getElementById("year").value.trim(),
     make: document.getElementById("make").value.trim(),
     model: document.getElementById("model").value.trim(),
+    color: document.getElementById("color").value,
+    vsize: document.getElementById("vsize").value,
     source: document.getElementById("source").value
   };
 
@@ -215,8 +347,9 @@ function submitForm() {
     try {
       var data = JSON.parse(xhr.responseText);
       if (xhr.status >= 400) throw new Error(data.error || "Server error");
+      var displayName = currentType === "fleet" ? companyName : firstName + " " + lastName;
       document.getElementById("success-name").textContent =
-        "We have received your details, " + payload.firstName + " " + payload.lastName + ".";
+        "We have received your details, " + displayName + ".";
       document.getElementById("main-form").style.display = "none";
       document.getElementById("success-card").classList.add("show");
     } catch(e) {
@@ -227,17 +360,20 @@ function submitForm() {
   };
   xhr.onerror = function() {
     bar.className = "status-bar error";
-    bar.textContent = "Connection failed. Please check your internet connection and try again.";
+    bar.textContent = "Connection failed. Please check your internet and try again.";
     btn.disabled = false;
   };
   xhr.send(JSON.stringify(payload));
 }
 
 function clearForm() {
-  ["firstname","lastname","address","city","postcode","phone","email","year","make","model"]
-    .forEach(function(id){document.getElementById(id).value="";});
+  ["firstname","lastname","companyname","firstname-fleet","lastname-fleet",
+   "address","city","postcode","phone","email","year","make","model"]
+    .forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ""; });
   document.getElementById("source").value = "";
-  document.querySelectorAll(".field").forEach(function(f){f.classList.remove("invalid");});
+  document.getElementById("color").value = "";
+  document.getElementById("vsize").value = "LightDuty";
+  document.querySelectorAll(".field").forEach(function(f) { f.classList.remove("invalid"); });
   var bar = document.getElementById("status-bar");
   bar.className = "status-bar";
   bar.textContent = "";
@@ -246,10 +382,13 @@ function clearForm() {
 
 function resetForm() {
   clearForm();
+  setType("individual");
   document.getElementById("main-form").style.display = "block";
   document.getElementById("success-card").classList.remove("show");
 }
 </script>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBHzoORtnG6OG3_5ok_imUZYWdDEMZLwJg&libraries=places&callback=initAutocomplete" async defer></script>
 
 </body>
 </html>
