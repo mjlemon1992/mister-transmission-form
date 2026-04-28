@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mister Transmission">
 <title>Customer Intake — Mister Transmission</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f5; min-height: 100vh; padding: 2rem 1rem; }
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f5; min-height: 100vh; padding: 2rem 1rem; padding-top: calc(2rem + env(safe-area-inset-top)); }
   .form-wrap { max-width: 740px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 2rem 2.5rem 2.5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
   .shop-header { text-align: center; padding-bottom: 1.5rem; border-bottom: 1px solid #eee; margin-bottom: 2rem; }
   .shop-header img { height: 80px; display: block; margin: 0 auto 12px; }
@@ -70,158 +72,155 @@
       </div>
     </div>
 
-```
-<div id="individual-fields">
-  <p class="section-label">Personal information</p>
-  <div class="field-grid two">
-    <div class="field" id="f-firstname">
-      <label for="firstname">First name *</label>
-      <input type="text" id="firstname" placeholder="John" autocomplete="given-name">
-      <span class="error-msg">Please enter your first name</span>
+    <div id="individual-fields">
+      <p class="section-label">Personal information</p>
+      <div class="field-grid two">
+        <div class="field" id="f-firstname">
+          <label for="firstname">First name *</label>
+          <input type="text" id="firstname" placeholder="John" autocomplete="given-name">
+          <span class="error-msg">Please enter your first name</span>
+        </div>
+        <div class="field" id="f-lastname">
+          <label for="lastname">Last name *</label>
+          <input type="text" id="lastname" placeholder="Smith" autocomplete="family-name">
+          <span class="error-msg">Please enter your last name</span>
+        </div>
+      </div>
     </div>
-    <div class="field" id="f-lastname">
-      <label for="lastname">Last name *</label>
-      <input type="text" id="lastname" placeholder="Smith" autocomplete="family-name">
-      <span class="error-msg">Please enter your last name</span>
+
+    <div id="fleet-fields" class="hidden">
+      <p class="section-label">Company information</p>
+      <div class="field-grid" style="grid-template-columns:1fr">
+        <div class="field" id="f-companyname">
+          <label for="companyname">Company name *</label>
+          <input type="text" id="companyname" placeholder="Acme Corp">
+          <span class="error-msg">Please enter the company name</span>
+        </div>
+      </div>
+      <div class="field-grid two">
+        <div class="field" id="f-firstname-fleet">
+          <label for="firstname-fleet">Contact first name *</label>
+          <input type="text" id="firstname-fleet" placeholder="John" autocomplete="given-name">
+          <span class="error-msg">Please enter first name</span>
+        </div>
+        <div class="field" id="f-lastname-fleet">
+          <label for="lastname-fleet">Contact last name *</label>
+          <input type="text" id="lastname-fleet" placeholder="Smith" autocomplete="family-name">
+          <span class="error-msg">Please enter last name</span>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
 
-<div id="fleet-fields" class="hidden">
-  <p class="section-label">Company information</p>
-  <div class="field-grid" style="grid-template-columns:1fr">
-    <div class="field" id="f-companyname">
-      <label for="companyname">Company name *</label>
-      <input type="text" id="companyname" placeholder="Acme Corp">
-      <span class="error-msg">Please enter the company name</span>
+    <div class="field-grid" style="grid-template-columns:1fr">
+      <div class="field" id="f-address">
+        <label for="address">Street address *</label>
+        <input type="text" id="address" placeholder="123 Main Street" autocomplete="street-address">
+        <span class="error-msg">Please enter your address</span>
+      </div>
     </div>
-  </div>
-  <div class="field-grid two">
-    <div class="field" id="f-firstname-fleet">
-      <label for="firstname-fleet">Contact first name *</label>
-      <input type="text" id="firstname-fleet" placeholder="John" autocomplete="given-name">
-      <span class="error-msg">Please enter first name</span>
+    <div class="field-grid two">
+      <div class="field" id="f-city">
+        <label for="city">City / suburb *</label>
+        <input type="text" id="city" placeholder="Springfield" autocomplete="address-level2">
+        <span class="error-msg">Please enter your city</span>
+      </div>
+      <div class="field" id="f-postcode">
+        <label for="postcode">Postcode *</label>
+        <input type="text" id="postcode" placeholder="A1A 1A1" autocomplete="postal-code">
+        <span class="error-msg">Please enter your postcode</span>
+      </div>
     </div>
-    <div class="field" id="f-lastname-fleet">
-      <label for="lastname-fleet">Contact last name *</label>
-      <input type="text" id="lastname-fleet" placeholder="Smith" autocomplete="family-name">
-      <span class="error-msg">Please enter last name</span>
+    <div class="field-grid two">
+      <div class="field" id="f-phone">
+        <label for="phone">Contact number *</label>
+        <input type="tel" id="phone" placeholder="(555) 000-0000" autocomplete="tel" inputmode="tel">
+        <span class="error-msg">Please enter your phone number</span>
+      </div>
+      <div class="field" id="f-email">
+        <label for="email">Email address *</label>
+        <input type="email" id="email" placeholder="john@example.com" autocomplete="email" inputmode="email">
+        <span class="error-msg">Please enter a valid email address</span>
+      </div>
     </div>
-  </div>
-</div>
 
-<div class="field-grid" style="grid-template-columns:1fr">
-  <div class="field" id="f-address">
-    <label for="address">Street address *</label>
-    <input type="text" id="address" placeholder="123 Main Street" autocomplete="street-address">
-    <span class="error-msg">Please enter your address</span>
-  </div>
-</div>
-<div class="field-grid two">
-  <div class="field" id="f-city">
-    <label for="city">City / suburb *</label>
-    <input type="text" id="city" placeholder="Springfield" autocomplete="address-level2">
-    <span class="error-msg">Please enter your city</span>
-  </div>
-  <div class="field" id="f-postcode">
-    <label for="postcode">Postcode *</label>
-    <input type="text" id="postcode" placeholder="A1A 1A1" autocomplete="postal-code">
-    <span class="error-msg">Please enter your postcode</span>
-  </div>
-</div>
-<div class="field-grid two">
-  <div class="field" id="f-phone">
-    <label for="phone">Contact number *</label>
-    <input type="tel" id="phone" placeholder="(555) 000-0000" autocomplete="tel" inputmode="tel">
-    <span class="error-msg">Please enter your phone number</span>
-  </div>
-  <div class="field" id="f-email">
-    <label for="email">Email address *</label>
-    <input type="email" id="email" placeholder="john@example.com" autocomplete="email" inputmode="email">
-    <span class="error-msg">Please enter a valid email address</span>
-  </div>
-</div>
+    <hr class="divider">
+    <p class="section-label">Vehicle details</p>
+    <div class="field-grid four">
+      <div class="field" id="f-year">
+        <label for="year">Year *</label>
+        <input type="text" id="year" placeholder="2019" inputmode="numeric" maxlength="4">
+        <span class="error-msg">Required</span>
+      </div>
+      <div class="field" id="f-make">
+        <label for="make">Make *</label>
+        <input type="text" id="make" placeholder="Toyota">
+        <span class="error-msg">Required</span>
+      </div>
+      <div class="field" id="f-model">
+        <label for="model">Model *</label>
+        <input type="text" id="model" placeholder="Camry">
+        <span class="error-msg">Required</span>
+      </div>
+      <div class="field" id="f-color">
+        <label for="color">Colour *</label>
+        <select id="color">
+          <option value="">Select</option>
+          <option value="White">White</option>
+          <option value="Silver">Silver</option>
+          <option value="Gray">Gray</option>
+          <option value="Black">Black</option>
+          <option value="Blue">Blue</option>
+          <option value="Red">Red</option>
+          <option value="Brown">Brown</option>
+          <option value="Burgundy">Burgundy</option>
+          <option value="Tan">Tan</option>
+          <option value="Gold">Gold</option>
+          <option value="Green">Green</option>
+          <option value="Yellow">Yellow</option>
+          <option value="Orange">Orange</option>
+          <option value="Pink">Pink</option>
+          <option value="Purple">Purple</option>
+          <option value="Other">Other</option>
+        </select>
+        <span class="error-msg">Required</span>
+      </div>
+    </div>
+    <div class="field-grid two">
+      <div class="field" id="f-vsize">
+        <label for="vsize">Vehicle size *</label>
+        <select id="vsize">
+          <option value="LightDuty">Light duty (car / SUV)</option>
+          <option value="HeavyDuty">Heavy duty (truck / commercial)</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="field" id="f-source">
+        <label for="source">How did you hear about us? *</label>
+        <select id="source">
+          <option value="">Select an option</option>
+          <option value="google">Google search</option>
+          <option value="facebook">Facebook</option>
+          <option value="instagram">Instagram</option>
+          <option value="referral">Friend or family referral</option>
+          <option value="repeat">Returning customer</option>
+          <option value="signage">Drove past / signage</option>
+          <option value="yellow-pages">Yellow Pages</option>
+          <option value="other">Other</option>
+        </select>
+        <span class="error-msg">Please select an option</span>
+      </div>
+    </div>
 
-<hr class="divider">
-<p class="section-label">Vehicle details</p>
-<div class="field-grid four">
-  <div class="field" id="f-year">
-    <label for="year">Year *</label>
-    <input type="text" id="year" placeholder="2019" inputmode="numeric" maxlength="4">
-    <span class="error-msg">Required</span>
-  </div>
-  <div class="field" id="f-make">
-    <label for="make">Make *</label>
-    <input type="text" id="make" placeholder="Toyota">
-    <span class="error-msg">Required</span>
-  </div>
-  <div class="field" id="f-model">
-    <label for="model">Model *</label>
-    <input type="text" id="model" placeholder="Camry">
-    <span class="error-msg">Required</span>
-  </div>
-  <div class="field" id="f-color">
-    <label for="color">Colour *</label>
-    <select id="color">
-      <option value="">Select</option>
-      <option value="White">White</option>
-      <option value="Silver">Silver</option>
-      <option value="Gray">Gray</option>
-      <option value="Black">Black</option>
-      <option value="Blue">Blue</option>
-      <option value="Red">Red</option>
-      <option value="Brown">Brown</option>
-      <option value="Burgundy">Burgundy</option>
-      <option value="Tan">Tan</option>
-      <option value="Gold">Gold</option>
-      <option value="Green">Green</option>
-      <option value="Yellow">Yellow</option>
-      <option value="Orange">Orange</option>
-      <option value="Pink">Pink</option>
-      <option value="Purple">Purple</option>
-      <option value="Other">Other</option>
-    </select>
-    <span class="error-msg">Required</span>
-  </div>
-</div>
-<div class="field-grid two">
-  <div class="field" id="f-vsize">
-    <label for="vsize">Vehicle size *</label>
-    <select id="vsize">
-      <option value="LightDuty">Light duty (car / SUV)</option>
-      <option value="HeavyDuty">Heavy duty (truck / commercial)</option>
-      <option value="Other">Other</option>
-    </select>
-  </div>
-  <div class="field" id="f-source">
-    <label for="source">How did you hear about us? *</label>
-    <select id="source">
-      <option value="">Select an option</option>
-      <option value="google">Google search</option>
-      <option value="facebook">Facebook</option>
-      <option value="instagram">Instagram</option>
-      <option value="referral">Friend or family referral</option>
-      <option value="repeat">Returning customer</option>
-      <option value="signage">Drove past / signage</option>
-      <option value="yellow-pages">Yellow Pages</option>
-      <option value="other">Other</option>
-    </select>
-    <span class="error-msg">Please select an option</span>
-  </div>
-</div>
+    <div class="notice-box">
+      <p>The information provided above will be used for two-way communication by either phone, email or text message.</p>
+    </div>
 
-<div class="notice-box">
-  <p>The information provided above will be used for two-way communication by either phone, email or text message.</p>
-</div>
+    <div id="status-bar" class="status-bar"></div>
 
-<div id="status-bar" class="status-bar"></div>
-
-<div class="submit-row">
-  <button class="btn-clear" onclick="clearForm()">Clear form</button>
-  <button class="btn-submit" id="submit-btn" onclick="submitForm()">Submit</button>
-</div>
-```
-
+    <div class="submit-row">
+      <button class="btn-clear" onclick="clearForm()">Clear form</button>
+      <button class="btn-submit" id="submit-btn" onclick="submitForm()">Submit</button>
+    </div>
   </div>
 
   <div class="success-card" id="success-card">
@@ -362,6 +361,5 @@ function resetForm() {
   document.getElementById("success-card").classList.remove("show");
 }
 </script>
-
 </body>
 </html>
