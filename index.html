@@ -51,6 +51,18 @@
   .success-card h2 { font-size: 22px; font-weight: 600; color: #2a7a2a; margin-bottom: 10px; }
   .success-card p { font-size: 15px; color: #555; }
   .hidden { display: none; }
+  .declaration-box { background: #fff; border: 1px solid #e3b58c; border-radius: 12px; padding: 1.25rem 1.5rem; margin: 1.75rem 0; }
+  .declaration-box h3 { font-size: 13px; color: #c0560f; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .declaration-box ul { margin: 0; padding-left: 1.1rem; }
+  .declaration-box li { font-size: 13.5px; color: #444; line-height: 1.65; margin-bottom: 7px; }
+  .sig-label { font-size: 13px; color: #333; font-weight: 600; margin: 16px 0 6px; }
+  .sig-pad { border: 2px dashed #ccc; border-radius: 10px; background: #fafafa; touch-action: none; width: 100%; height: 160px; display: block; }
+  .sig-row { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+  .sig-hint { font-size: 12px; color: #aaa; }
+  .sig-clear { background: transparent; border: 1px solid #ddd; border-radius: 8px; padding: 7px 16px; font-size: 13px; color: #888; cursor: pointer; }
+  .sig-error { font-size: 12px; color: #cc3333; display: none; margin-top: 4px; }
+  .sig-wrap.invalid .sig-pad { border-color: #cc3333; border-style: solid; }
+  .sig-wrap.invalid .sig-error { display: block; }
   @media (max-width: 600px) { .form-wrap { padding: 1.5rem 1.25rem; } .field-grid.two, .field-grid.three, .field-grid.four { grid-template-columns: 1fr 1fr; } }
 </style>
 </head>
@@ -217,6 +229,24 @@
       <p>The information provided above will be used for two-way communication by either phone, email or text message.</p>
     </div>
 
+    <div class="declaration-box">
+      <h3>Customer Declaration</h3>
+      <ul>
+        <li>The vehicle has valid insurance and registration.</li>
+        <li>Any fines linked to no insurance, registration, or illegal modifications will be passed on to the customer.</li>
+        <li>Any vehicle left more than 5 days after completion will be charged $20 per day plus tax, unless otherwise authorized by us.</li>
+      </ul>
+      <p class="sig-label">Please sign below to confirm you have read and agree to the above *</p>
+      <div class="sig-wrap" id="f-signature">
+        <canvas id="sig-pad" class="sig-pad"></canvas>
+        <div class="sig-row">
+          <span class="sig-hint">Sign with your finger or stylus</span>
+          <button type="button" class="sig-clear" onclick="clearSignature()">Clear</button>
+        </div>
+        <span class="sig-error">A signature is required to submit</span>
+      </div>
+    </div>
+
     <div id="status-bar" class="status-bar"></div>
 
     <div class="submit-row">
@@ -241,7 +271,49 @@ var currentType = "individual";
 // Scroll to top on load to hide Safari bar
 window.addEventListener("load", function() {
   setTimeout(function() { window.scrollTo(0, 1); }, 100);
+  initSignature();
 });
+
+var DECLARATION_TEXT = "The vehicle has valid insurance and registration. Any fines linked to no insurance, registration, or illegal modifications will be passed on to the customer. Any vehicle left more than 5 days after completion will be charged $20 per day plus tax, unless otherwise authorized by us.";
+
+// ---- Signature pad ----
+var sigCanvas, sigCtx, sigDrawing = false, sigHasInk = false;
+function initSignature() {
+  sigCanvas = document.getElementById("sig-pad");
+  if (!sigCanvas) return;
+  var ratio = window.devicePixelRatio || 1;
+  var rect = sigCanvas.getBoundingClientRect();
+  sigCanvas.width = Math.round(rect.width * ratio);
+  sigCanvas.height = Math.round(rect.height * ratio);
+  sigCtx = sigCanvas.getContext("2d");
+  sigCtx.scale(ratio, ratio);
+  sigCtx.lineWidth = 2.2;
+  sigCtx.lineCap = "round";
+  sigCtx.lineJoin = "round";
+  sigCtx.strokeStyle = "#111";
+  function pos(e) {
+    var r = sigCanvas.getBoundingClientRect();
+    var t = (e.touches && e.touches[0]) ? e.touches[0] : e;
+    return { x: t.clientX - r.left, y: t.clientY - r.top };
+  }
+  function start(e) { e.preventDefault(); sigDrawing = true; var p = pos(e); sigCtx.beginPath(); sigCtx.moveTo(p.x, p.y); }
+  function move(e) { if (!sigDrawing) return; e.preventDefault(); var p = pos(e); sigCtx.lineTo(p.x, p.y); sigCtx.stroke(); sigHasInk = true; var w = document.getElementById("f-signature"); if (w) w.classList.remove("invalid"); }
+  function end() { sigDrawing = false; }
+  sigCanvas.addEventListener("mousedown", start);
+  sigCanvas.addEventListener("mousemove", move);
+  window.addEventListener("mouseup", end);
+  sigCanvas.addEventListener("touchstart", start, { passive: false });
+  sigCanvas.addEventListener("touchmove", move, { passive: false });
+  sigCanvas.addEventListener("touchend", end);
+}
+function clearSignature() {
+  if (!sigCtx) return;
+  sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+  sigHasInk = false;
+}
+function getSignatureData() {
+  return (sigHasInk && sigCanvas) ? sigCanvas.toDataURL("image/png") : "";
+}
 
 function setType(type) {
   currentType = type;
@@ -283,6 +355,9 @@ function validate() {
   check("f-model", "model", notEmpty);
   check("f-color", "color", selected);
   check("f-source", "source", selected);
+
+  if (!sigHasInk) { document.getElementById("f-signature").classList.add("invalid"); ok = false; }
+  else { document.getElementById("f-signature").classList.remove("invalid"); }
   return ok;
 }
 
@@ -318,7 +393,9 @@ function submitForm() {
     model: document.getElementById("model").value.trim(),
     color: document.getElementById("color").value,
     vsize: document.getElementById("vsize").value,
-    source: document.getElementById("source").value
+    source: document.getElementById("source").value,
+    signature: getSignatureData(),
+    declaration: DECLARATION_TEXT
   };
 
   var xhr = new XMLHttpRequest();
@@ -354,6 +431,8 @@ function clearForm() {
   document.getElementById("source").value = "";
   document.getElementById("color").value = "";
   document.getElementById("vsize").value = "LightDuty";
+  clearSignature();
+  var sigW = document.getElementById("f-signature"); if (sigW) sigW.classList.remove("invalid");
   document.querySelectorAll(".field").forEach(function(f) { f.classList.remove("invalid"); });
   var bar = document.getElementById("status-bar");
   bar.className = "status-bar";

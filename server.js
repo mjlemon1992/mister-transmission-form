@@ -5,7 +5,7 @@ var path = require("path");
 
 var app = express();
 app.use(cors({ origin: "*" }));
-app.use(express.json());
+app.use(express.json({ limit: "6mb" }));
 
 var SM_API_KEY = (process.env.SM_API_KEY || "").trim();
 var SM_BASE = "api.shopmonkey.cloud";
@@ -46,6 +46,61 @@ function smPost(path, body) {
     req.write(data);
     req.end();
   });
+}
+
+// Generic Shopmonkey request (any method) — used for post-order updates.
+function smRequest(method, apiPath, body) {
+  return new Promise(function(resolve, reject) {
+    var data = body ? JSON.stringify(body) : "";
+    var options = {
+      hostname: SM_BASE,
+      port: 443,
+      path: "/v3" + apiPath,
+      method: method,
+      headers: {
+        "Authorization": "Bearer " + SM_API_KEY,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(data)
+      }
+    };
+    var req = https.request(options, function(res) {
+      var chunks = [];
+      res.on("data", function(c) { chunks.push(c); });
+      res.on("end", function() {
+        var txt = Buffer.concat(chunks).toString();
+        if (res.statusCode >= 400) {
+          reject(new Error("Shopmonkey " + method + " " + apiPath + " -> " + res.statusCode + ": " + txt));
+        } else {
+          try { resolve(JSON.parse(txt)); } catch(e) { resolve({}); }
+        }
+      });
+    });
+    req.on("error", reject);
+    req.setTimeout(15000, function() {
+      req.destroy(new Error("Shopmonkey request timed out"));
+    });
+    if (data) req.write(data);
+    req.end();
+  });
+}
+
+// Best-effort: write the signed declaration (and signature marker) onto the
+// order's internal notes. Non-blocking — never fails a check-in.
+// NOTE: the exact Shopmonkey field/endpoint for internal notes + signature-image
+// attachment must be confirmed with one live check-in, then adjusted here.
+function attachDeclaration(orderId, b, isFleet) {
+  if (!orderId) return Promise.resolve();
+  var signedBy = isFleet ? (b.companyName || "") : ((b.firstName || "") + " " + (b.lastName || "")).trim();
+  var hasSig = !!b.signature;
+  var note =
+    "CUSTOMER CHECK-IN DECLARATION\n" +
+    "Signed by: " + signedBy + "\n" +
+    "Signed at: " + new Date().toISOString() + "\n\n" +
+    (b.declaration || "") +
+    "\n\nSignature captured at check-in: " + (hasSig ? "YES" : "NO");
+  console.log("attachDeclaration: order " + orderId +
+    (hasSig ? " (signature ~" + Math.round(b.signature.length / 1024) + "KB)" : " (no signature)"));
+  return smRequest("PATCH", "/order/" + orderId, { internalNotes: note });
 }
 
 // Serve the intake form (index.html lives at the repo root)
@@ -132,6 +187,11 @@ app.post("/checkin", function(req, res) {
       customerId: customerId,
       vehicleId: vehicleId,
       orderId: orderId
+    });
+    // Attach the signed declaration to the work order after responding, so a
+    // failure here can never block the customer's check-in.
+    attachDeclaration(orderId, b, isFleet).catch(function(e) {
+      console.error("attachDeclaration failed:", e && e.message);
     });
   })
   .catch(function(err) {
