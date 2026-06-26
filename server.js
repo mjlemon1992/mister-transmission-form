@@ -354,13 +354,23 @@ app.get("/__verify", function(req, res) {
   var orderId = req.query.orderId;
   Promise.all([
     smTry("GET", "/order/" + orderId),
-    smTry("GET", "/message?limit=100&sort=-createdDate")
+    smTry("GET", "/order/" + orderId + "/message"),
+    smTry("GET", "/message?where[orderId]=" + orderId),
+    smTry("GET", "/message?limit=200&sort=-createdDate")
   ]).then(function(r) {
     var order = (r[0].ok && r[0].response && r[0].response.data) || {};
-    var msgs = ((r[1].ok && r[1].response && r[1].response.data) || [])
-      .filter(function(m) { return m.orderId === orderId; })
-      .map(function(m) { return { internal: m.internal, type: m.type, text: (m.text || "").slice(0, 120) }; });
-    res.json({ messageCount: order.messageCount, messagesOnOrder: msgs });
+    function pick(x) {
+      var d = x && x.ok && x.response && x.response.data;
+      if (!Array.isArray(d)) return null;
+      return d.filter(function(m) { return m.orderId === orderId; })
+        .map(function(m) { return { internal: m.internal, type: m.type, text: (m.text || "").slice(0, 130) }; });
+    }
+    res.json({
+      messageCount: order.messageCount,
+      via_order_message: { status: r[1].ok ? "ok" : r[1].error, msgs: pick(r[1]) },
+      via_where_filter: { status: r[2].ok ? "ok" : r[2].error, msgs: pick(r[2]) },
+      via_full_list: pick(r[3])
+    });
   });
 });
 
