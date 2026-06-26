@@ -112,6 +112,38 @@ app.get("/health", function(req, res) {
   res.json({ status: "ok" });
 });
 
+// TEMPORARY diagnostic — discovers the correct Shopmonkey note/message endpoint
+// against a real order. Token-gated; remove once the attach is wired.
+function smTry(method, apiPath, body) {
+  return smRequest(method, apiPath, body).then(
+    function(r) { return { ok: true, method: method, path: apiPath, response: r }; },
+    function(e) { return { ok: false, method: method, path: apiPath, error: e.message }; }
+  );
+}
+app.get("/__probe", function(req, res) {
+  if (req.query.token !== "diag-7k2p9x") return res.status(403).json({ error: "forbidden" });
+  var orderId = req.query.orderId;
+  if (!orderId) return res.status(400).json({ error: "orderId required" });
+  var note = "DIAG internal note " + new Date().toISOString();
+  Promise.all([
+    smTry("GET", "/order/" + orderId),
+    smTry("POST", "/order/" + orderId + "/message", { type: "Internal", message: note }),
+    smTry("POST", "/message", { orderId: orderId, type: "Internal", body: note }),
+    smTry("POST", "/order/" + orderId + "/internal-message", { message: note }),
+    smTry("POST", "/internal-message", { orderId: orderId, message: note }),
+    smTry("GET", "/message?orderId=" + orderId),
+    smTry("GET", "/message_thread?where[orderId]=" + orderId)
+  ]).then(function(results) {
+    results.forEach(function(r) {
+      if (r.path === "/order/" + orderId && r.ok && r.response && r.response.data) {
+        r.orderDataKeys = Object.keys(r.response.data);
+        delete r.response;
+      }
+    });
+    res.json({ orderId: orderId, results: results });
+  });
+});
+
 app.post("/checkin", function(req, res) {
   var b = req.body || {};
   var isFleet = b.customerType === "fleet";
