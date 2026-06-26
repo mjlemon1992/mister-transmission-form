@@ -143,6 +143,28 @@ app.get("/__probe", function(req, res) {
     res.json({ orderId: orderId, results: results });
   });
 });
+app.get("/__probe2", function(req, res) {
+  if (req.query.token !== "diag-7k2p9x") return res.status(403).json({ error: "forbidden" });
+  var orderId = req.query.orderId;
+  Promise.all([
+    smTry("GET", "/order/" + orderId),
+    smTry("GET", "/message?limit=8&sort=-createdDate")
+  ]).then(function(r) {
+    var order = (r[0].ok && r[0].response && r[0].response.data) || {};
+    var msgs = (r[1].ok && r[1].response && r[1].response.data) || [];
+    var sample = msgs[0] || {};
+    var types = {};
+    msgs.forEach(function(m) { types[m.type] = (types[m.type] || 0) + 1; });
+    // field NAMES only (no content), plus which fields look note/body/internal related
+    res.json({
+      conversationId: order.conversationId,
+      customerId: order.customerId,
+      messageFieldNames: Object.keys(sample),
+      distinctTypes: types,
+      hasInternalFlag: ("internal" in sample) || ("isInternal" in sample)
+    });
+  });
+});
 
 app.post("/checkin", function(req, res) {
   var b = req.body || {};
