@@ -186,6 +186,36 @@ app.get("/__probe3", function(req, res) {
     res.json({ results: r });
   });
 });
+app.get("/__probe4", function(req, res) {
+  if (req.query.token !== "diag-7k2p9x") return res.status(403).json({ error: "forbidden" });
+  var customerId = req.query.customerId, orderId = req.query.orderId;
+  function mk(extra) {
+    return Object.assign({ customerId: customerId, orderId: orderId,
+      text: "DIAG " + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+      sendEmail: false, sendSms: false }, extra);
+  }
+  Promise.all([
+    smTry("POST", "/message", mk({ internal: true })),
+    smTry("POST", "/message", mk({ internal: true, type: "Internal" })),
+    smTry("POST", "/message", mk({ internal: true, type: "Note" })),
+    smTry("POST", "/file", { orderId: orderId }),
+    smTry("POST", "/order/" + orderId + "/file", {}),
+    smTry("GET", "/message?limit=50&sort=-createdDate")
+  ]).then(function(r) {
+    function sm(x) { return (x.ok && x.response && x.response.data)
+      ? { ok: true, internal: x.response.data.internal, type: x.response.data.type, id: x.response.data.id } : x; }
+    r[0] = sm(r[0]); r[1] = sm(r[1]); r[2] = sm(r[2]);
+    var withFile = null;
+    if (r[5].ok && r[5].response && r[5].response.data) {
+      var arr = r[5].response.data;
+      for (var k = 0; k < arr.length; k++) {
+        if (arr[k].files && arr[k].files.length) { withFile = { fileKeys: Object.keys(arr[k].files[0]) }; break; }
+      }
+      r[5] = { messagesScanned: arr.length, withFile: withFile };
+    }
+    res.json({ results: r });
+  });
+});
 
 app.post("/checkin", function(req, res) {
   var b = req.body || {};
