@@ -349,6 +349,21 @@ app.post("/checkin", function(req, res) {
   });
 });
 
+app.get("/__verify", function(req, res) {
+  if (req.query.token !== "diag-7k2p9x") return res.status(403).json({ error: "forbidden" });
+  var orderId = req.query.orderId;
+  Promise.all([
+    smTry("GET", "/order/" + orderId),
+    smTry("GET", "/message?limit=100&sort=-createdDate")
+  ]).then(function(r) {
+    var order = (r[0].ok && r[0].response && r[0].response.data) || {};
+    var msgs = ((r[1].ok && r[1].response && r[1].response.data) || [])
+      .filter(function(m) { return m.orderId === orderId; })
+      .map(function(m) { return { internal: m.internal, type: m.type, text: (m.text || "").slice(0, 120) }; });
+    res.json({ messageCount: order.messageCount, messagesOnOrder: msgs });
+  });
+});
+
 app.listen(PORT, function() {
   console.log("Server running on port " + PORT);
 });
