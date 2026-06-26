@@ -88,19 +88,28 @@ function smRequest(method, apiPath, body) {
 // order's internal notes. Non-blocking — never fails a check-in.
 // NOTE: the exact Shopmonkey field/endpoint for internal notes + signature-image
 // attachment must be confirmed with one live check-in, then adjusted here.
-function attachDeclaration(orderId, b, isFleet) {
-  if (!orderId) return Promise.resolve();
+function attachDeclaration(orderId, customerId, b, isFleet) {
+  if (!orderId || !customerId) return Promise.resolve();
   var signedBy = isFleet ? (b.companyName || "") : ((b.firstName || "") + " " + (b.lastName || "")).trim();
   var hasSig = !!b.signature;
-  var note =
-    "CUSTOMER CHECK-IN DECLARATION\n" +
+  var text =
+    "CUSTOMER CHECK-IN DECLARATION — agreed & signed at check-in\n" +
     "Signed by: " + signedBy + "\n" +
-    "Signed at: " + new Date().toISOString() + "\n\n" +
+    "Date: " + new Date().toISOString() + "\n\n" +
     (b.declaration || "") +
-    "\n\nSignature captured at check-in: " + (hasSig ? "YES" : "NO");
+    "\n\nSignature captured: " + (hasSig ? "YES" : "NO");
   console.log("attachDeclaration: order " + orderId +
     (hasSig ? " (signature ~" + Math.round(b.signature.length / 1024) + "KB)" : " (no signature)"));
-  return smRequest("PATCH", "/order/" + orderId, { internalNotes: note });
+  // Post as a note on the order's message thread (confirmed-working endpoint).
+  return smRequest("POST", "/message", {
+    customerId: customerId,
+    orderId: orderId,
+    text: text,
+    internal: true,
+    sendEmail: false,
+    sendSms: false,
+    contentType: "PlainText"
+  });
 }
 
 // Serve the intake form (index.html lives at the repo root)
@@ -330,7 +339,7 @@ app.post("/checkin", function(req, res) {
     });
     // Attach the signed declaration to the work order after responding, so a
     // failure here can never block the customer's check-in.
-    attachDeclaration(orderId, b, isFleet).catch(function(e) {
+    attachDeclaration(orderId, customerId, b, isFleet).catch(function(e) {
       console.error("attachDeclaration failed:", e && e.message);
     });
   })
