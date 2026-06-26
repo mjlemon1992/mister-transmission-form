@@ -11,44 +11,6 @@ var SM_API_KEY = (process.env.SM_API_KEY || "").trim();
 var SM_BASE = "api.shopmonkey.cloud";
 var PORT = process.env.PORT || 3000;
 
-function smPost(path, body) {
-  return new Promise(function(resolve, reject) {
-    var data = JSON.stringify(body);
-    var options = {
-      hostname: SM_BASE,
-      port: 443,
-      path: "/v3" + path,
-      method: "POST",
-      headers: {
-        "Authorization": "Bearer " + SM_API_KEY,
-        "Content-Type": "application/json",
-        "Content-Length": Buffer.byteLength(data)
-      }
-    };
-    var req = https.request(options, function(res) {
-      var chunks = [];
-      res.on("data", function(c) { chunks.push(c); });
-      res.on("end", function() {
-        try {
-          var json = JSON.parse(Buffer.concat(chunks).toString());
-          if (res.statusCode >= 400) {
-            reject(new Error("Shopmonkey error: " + JSON.stringify(json)));
-          } else {
-            resolve(json);
-          }
-        } catch(e) { reject(e); }
-      });
-    });
-    req.on("error", reject);
-    req.setTimeout(15000, function() {
-      req.destroy(new Error("Shopmonkey request timed out"));
-    });
-    req.write(data);
-    req.end();
-  });
-}
-
-// Generic Shopmonkey request (any method) — used for post-order updates.
 function smRequest(method, apiPath, body) {
   return new Promise(function(resolve, reject) {
     var data = body ? JSON.stringify(body) : "";
@@ -84,23 +46,21 @@ function smRequest(method, apiPath, body) {
   });
 }
 
-// Best-effort: write the signed declaration (and signature marker) onto the
-// order's internal notes. Non-blocking — never fails a check-in.
-// NOTE: the exact Shopmonkey field/endpoint for internal notes + signature-image
-// attachment must be confirmed with one live check-in, then adjusted here.
+function smPost(apiPath, body) { return smRequest("POST", apiPath, body); }
+
+// Post the signed declaration as an internal note on the order's message thread.
+// Non-blocking — never fails a check-in. (Shopmonkey's API can attach existing
+// files by id but has no public upload endpoint, so the drawn signature image
+// itself can't be pushed to the order via the API — see README.)
 function attachDeclaration(orderId, customerId, b, isFleet) {
   if (!orderId || !customerId) return Promise.resolve();
   var signedBy = isFleet ? (b.companyName || "") : ((b.firstName || "") + " " + (b.lastName || "")).trim();
-  var hasSig = !!b.signature;
   var text =
     "CUSTOMER CHECK-IN DECLARATION — agreed & signed at check-in\n" +
     "Signed by: " + signedBy + "\n" +
     "Date: " + new Date().toISOString() + "\n\n" +
     (b.declaration || "") +
-    "\n\nSignature captured: " + (hasSig ? "YES" : "NO");
-  console.log("attachDeclaration: order " + orderId +
-    (hasSig ? " (signature ~" + Math.round(b.signature.length / 1024) + "KB)" : " (no signature)"));
-  // Post as a note on the order's message thread (confirmed-working endpoint).
+    "\n\nSignature captured on the check-in form: " + (b.signature ? "YES" : "NO");
   return smRequest("POST", "/message", {
     customerId: customerId,
     orderId: orderId,
@@ -119,146 +79,6 @@ app.get("/", function(req, res) {
 
 app.get("/health", function(req, res) {
   res.json({ status: "ok" });
-});
-
-// TEMPORARY diagnostic — discovers the correct Shopmonkey note/message endpoint
-// against a real order. Token-gated; remove once the attach is wired.
-function smTry(method, apiPath, body) {
-  return smRequest(method, apiPath, body).then(
-    function(r) { return { ok: true, method: method, path: apiPath, response: r }; },
-    function(e) { return { ok: false, method: method, path: apiPath, error: e.message }; }
-  );
-}
-app.get("/__probe", function(req, res) {
-  if (req.query.token !== "diag-7k2p9x") return res.status(403).json({ error: "forbidden" });
-  var orderId = req.query.orderId;
-  if (!orderId) return res.status(400).json({ error: "orderId required" });
-  var note = "DIAG internal note " + new Date().toISOString();
-  Promise.all([
-    smTry("GET", "/order/" + orderId),
-    smTry("POST", "/order/" + orderId + "/message", { type: "Internal", message: note }),
-    smTry("POST", "/message", { orderId: orderId, type: "Internal", body: note }),
-    smTry("POST", "/order/" + orderId + "/internal-message", { message: note }),
-    smTry("POST", "/internal-message", { orderId: orderId, message: note }),
-    smTry("GET", "/message?orderId=" + orderId),
-    smTry("GET", "/message_thread?where[orderId]=" + orderId)
-  ]).then(function(results) {
-    results.forEach(function(r) {
-      if (r.path === "/order/" + orderId && r.ok && r.response && r.response.data) {
-        r.orderDataKeys = Object.keys(r.response.data);
-        delete r.response;
-      }
-    });
-    res.json({ orderId: orderId, results: results });
-  });
-});
-app.get("/__probe2", function(req, res) {
-  if (req.query.token !== "diag-7k2p9x") return res.status(403).json({ error: "forbidden" });
-  var orderId = req.query.orderId;
-  Promise.all([
-    smTry("GET", "/order/" + orderId),
-    smTry("GET", "/message?limit=8&sort=-createdDate")
-  ]).then(function(r) {
-    var order = (r[0].ok && r[0].response && r[0].response.data) || {};
-    var msgs = (r[1].ok && r[1].response && r[1].response.data) || [];
-    var sample = msgs[0] || {};
-    var types = {};
-    msgs.forEach(function(m) { types[m.type] = (types[m.type] || 0) + 1; });
-    // field NAMES only (no content), plus which fields look note/body/internal related
-    res.json({
-      conversationId: order.conversationId,
-      customerId: order.customerId,
-      messageFieldNames: Object.keys(sample),
-      distinctTypes: types,
-      hasInternalFlag: ("internal" in sample) || ("isInternal" in sample)
-    });
-  });
-});
-app.get("/__probe3", function(req, res) {
-  if (req.query.token !== "diag-7k2p9x") return res.status(403).json({ error: "forbidden" });
-  var customerId = req.query.customerId;
-  var orderId = req.query.orderId;
-  var note = "DIAG internal note " + new Date().toISOString();
-  function body(t) {
-    return { customerId: customerId, orderId: orderId, text: note, type: t,
-             internal: true, sendEmail: false, sendSms: false, contentType: "Text" };
-  }
-  Promise.all([
-    smTry("POST", "/message", body("__INVALID__")),
-    smTry("POST", "/message", body("Note")),
-    smTry("POST", "/message", body("Internal")),
-    smTry("GET", "/file?limit=2&sort=-createdDate")
-  ]).then(function(r) {
-    if (r[3] && r[3].ok && r[3].response && r[3].response.data && r[3].response.data[0]) {
-      r[3] = { fileFieldNames: Object.keys(r[3].response.data[0]) };
-    }
-    res.json({ results: r });
-  });
-});
-app.get("/__probe4", function(req, res) {
-  if (req.query.token !== "diag-7k2p9x") return res.status(403).json({ error: "forbidden" });
-  var customerId = req.query.customerId, orderId = req.query.orderId;
-  function mk(extra) {
-    return Object.assign({ customerId: customerId, orderId: orderId,
-      text: "DIAG " + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
-      sendEmail: false, sendSms: false }, extra);
-  }
-  Promise.all([
-    smTry("POST", "/message", mk({ internal: true })),
-    smTry("POST", "/message", mk({ internal: true, type: "Internal" })),
-    smTry("POST", "/message", mk({ internal: true, type: "Note" })),
-    smTry("POST", "/file", { orderId: orderId }),
-    smTry("POST", "/order/" + orderId + "/file", {}),
-    smTry("GET", "/message?limit=50&sort=-createdDate")
-  ]).then(function(r) {
-    function sm(x) { return (x.ok && x.response && x.response.data)
-      ? { ok: true, internal: x.response.data.internal, type: x.response.data.type, id: x.response.data.id } : x; }
-    r[0] = sm(r[0]); r[1] = sm(r[1]); r[2] = sm(r[2]);
-    var withFile = null;
-    if (r[5].ok && r[5].response && r[5].response.data) {
-      var arr = r[5].response.data;
-      for (var k = 0; k < arr.length; k++) {
-        if (arr[k].files && arr[k].files.length) { withFile = { fileKeys: Object.keys(arr[k].files[0]) }; break; }
-      }
-      r[5] = { messagesScanned: arr.length, withFile: withFile };
-    }
-    res.json({ results: r });
-  });
-});
-app.get("/__probe5", function(req, res) {
-  if (req.query.token !== "diag-7k2p9x") return res.status(403).json({ error: "forbidden" });
-  var orderId = req.query.orderId, msgId = req.query.msgId;
-  Promise.all([
-    smTry("POST", "/file/upload", {}),
-    smTry("POST", "/file/upload-url", { fileName: "sig.png", fileType: "image/png" }),
-    smTry("POST", "/file/signed-url", { fileName: "sig.png", fileType: "image/png" }),
-    smTry("POST", "/upload", {}),
-    smTry("POST", "/attachment", {}),
-    smTry("POST", "/order/" + orderId + "/upload", {}),
-    smTry("POST", "/file/create", { fileName: "sig.png", fileType: "image/png" }),
-    smTry("PATCH", "/message/" + msgId, { internal: true }),
-    smTry("PUT", "/message/" + msgId, { internal: true })
-  ]).then(function(r) { res.json({ results: r }); });
-});
-app.get("/__probe6", function(req, res) {
-  if (req.query.token !== "diag-7k2p9x") return res.status(403).json({ error: "forbidden" });
-  var orderId = req.query.orderId, customerId = req.query.customerId;
-  var tiny = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
-  Promise.all([
-    smTry("POST", "/file/sign", { fileName: "sig.png", fileType: "image/png" }),
-    smTry("POST", "/file/request-upload", { fileName: "sig.png", fileType: "image/png" }),
-    smTry("POST", "/order/" + orderId + "/attachment", { fileName: "sig.png", fileType: "image/png" }),
-    smTry("POST", "/order/" + orderId + "/file-upload", { fileName: "sig.png", fileType: "image/png" }),
-    smTry("GET", "/file/upload-url?fileName=sig.png&fileType=image/png"),
-    smTry("POST", "/order/" + orderId + "/file", { fileName: "sig.png", fileType: "image/png", fileSize: 100, base64: tiny }),
-    smTry("POST", "/order/" + orderId + "/file", { fileName: "sig.png", fileType: "image/png", fileSize: 100, data: tiny }),
-    smTry("POST", "/message", { customerId: customerId, orderId: orderId, text: "DIAG inline " + Date.now(), sendEmail: false, sendSms: false, files: [{ fileName: "sig.png", fileType: "image/png", base64: tiny }] })
-  ]).then(function(r) {
-    if (r[7] && r[7].ok && r[7].response && r[7].response.data) {
-      r[7] = { ok: true, files: r[7].response.data.files, id: r[7].response.data.id };
-    }
-    res.json({ results: r });
-  });
 });
 
 app.post("/checkin", function(req, res) {
@@ -337,8 +157,8 @@ app.post("/checkin", function(req, res) {
       vehicleId: vehicleId,
       orderId: orderId
     });
-    // Attach the signed declaration to the work order after responding, so a
-    // failure here can never block the customer's check-in.
+    // Attach the signed declaration after responding, so a failure here can
+    // never block the customer's check-in.
     attachDeclaration(orderId, customerId, b, isFleet).catch(function(e) {
       console.error("attachDeclaration failed:", e && e.message);
     });
@@ -346,31 +166,6 @@ app.post("/checkin", function(req, res) {
   .catch(function(err) {
     console.error(err);
     res.status(500).json({ error: err.message });
-  });
-});
-
-app.get("/__verify", function(req, res) {
-  if (req.query.token !== "diag-7k2p9x") return res.status(403).json({ error: "forbidden" });
-  var orderId = req.query.orderId;
-  Promise.all([
-    smTry("GET", "/order/" + orderId),
-    smTry("GET", "/order/" + orderId + "/message"),
-    smTry("GET", "/message?where[orderId]=" + orderId),
-    smTry("GET", "/message?limit=200&sort=-createdDate")
-  ]).then(function(r) {
-    var order = (r[0].ok && r[0].response && r[0].response.data) || {};
-    function pick(x) {
-      var d = x && x.ok && x.response && x.response.data;
-      if (!Array.isArray(d)) return null;
-      return d.filter(function(m) { return m.orderId === orderId; })
-        .map(function(m) { return { internal: m.internal, type: m.type, text: (m.text || "").slice(0, 130) }; });
-    }
-    res.json({
-      messageCount: order.messageCount,
-      via_order_message: { status: r[1].ok ? "ok" : r[1].error, msgs: pick(r[1]) },
-      via_where_filter: { status: r[2].ok ? "ok" : r[2].error, msgs: pick(r[2]) },
-      via_full_list: pick(r[3])
-    });
   });
 });
 
