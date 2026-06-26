@@ -165,6 +165,27 @@ app.get("/__probe2", function(req, res) {
     });
   });
 });
+app.get("/__probe3", function(req, res) {
+  if (req.query.token !== "diag-7k2p9x") return res.status(403).json({ error: "forbidden" });
+  var customerId = req.query.customerId;
+  var orderId = req.query.orderId;
+  var note = "DIAG internal note " + new Date().toISOString();
+  function body(t) {
+    return { customerId: customerId, orderId: orderId, text: note, type: t,
+             internal: true, sendEmail: false, sendSms: false, contentType: "Text" };
+  }
+  Promise.all([
+    smTry("POST", "/message", body("__INVALID__")),
+    smTry("POST", "/message", body("Note")),
+    smTry("POST", "/message", body("Internal")),
+    smTry("GET", "/file?limit=2&sort=-createdDate")
+  ]).then(function(r) {
+    if (r[3] && r[3].ok && r[3].response && r[3].response.data && r[3].response.data[0]) {
+      r[3] = { fileFieldNames: Object.keys(r[3].response.data[0]) };
+    }
+    res.json({ results: r });
+  });
+});
 
 app.post("/checkin", function(req, res) {
   var b = req.body || {};
