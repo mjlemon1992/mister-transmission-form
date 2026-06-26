@@ -231,6 +231,26 @@ app.get("/__probe5", function(req, res) {
     smTry("PUT", "/message/" + msgId, { internal: true })
   ]).then(function(r) { res.json({ results: r }); });
 });
+app.get("/__probe6", function(req, res) {
+  if (req.query.token !== "diag-7k2p9x") return res.status(403).json({ error: "forbidden" });
+  var orderId = req.query.orderId, customerId = req.query.customerId;
+  var tiny = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+  Promise.all([
+    smTry("POST", "/file/sign", { fileName: "sig.png", fileType: "image/png" }),
+    smTry("POST", "/file/request-upload", { fileName: "sig.png", fileType: "image/png" }),
+    smTry("POST", "/order/" + orderId + "/attachment", { fileName: "sig.png", fileType: "image/png" }),
+    smTry("POST", "/order/" + orderId + "/file-upload", { fileName: "sig.png", fileType: "image/png" }),
+    smTry("GET", "/file/upload-url?fileName=sig.png&fileType=image/png"),
+    smTry("POST", "/order/" + orderId + "/file", { fileName: "sig.png", fileType: "image/png", fileSize: 100, base64: tiny }),
+    smTry("POST", "/order/" + orderId + "/file", { fileName: "sig.png", fileType: "image/png", fileSize: 100, data: tiny }),
+    smTry("POST", "/message", { customerId: customerId, orderId: orderId, text: "DIAG inline " + Date.now(), sendEmail: false, sendSms: false, files: [{ fileName: "sig.png", fileType: "image/png", base64: tiny }] })
+  ]).then(function(r) {
+    if (r[7] && r[7].ok && r[7].response && r[7].response.data) {
+      r[7] = { ok: true, files: r[7].response.data.files, id: r[7].response.data.id };
+    }
+    res.json({ results: r });
+  });
+});
 
 app.post("/checkin", function(req, res) {
   var b = req.body || {};
