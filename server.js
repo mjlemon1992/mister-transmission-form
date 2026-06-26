@@ -216,6 +216,21 @@ app.get("/__probe4", function(req, res) {
     res.json({ results: r });
   });
 });
+app.get("/__probe5", function(req, res) {
+  if (req.query.token !== "diag-7k2p9x") return res.status(403).json({ error: "forbidden" });
+  var orderId = req.query.orderId, msgId = req.query.msgId;
+  Promise.all([
+    smTry("POST", "/file/upload", {}),
+    smTry("POST", "/file/upload-url", { fileName: "sig.png", fileType: "image/png" }),
+    smTry("POST", "/file/signed-url", { fileName: "sig.png", fileType: "image/png" }),
+    smTry("POST", "/upload", {}),
+    smTry("POST", "/attachment", {}),
+    smTry("POST", "/order/" + orderId + "/upload", {}),
+    smTry("POST", "/file/create", { fileName: "sig.png", fileType: "image/png" }),
+    smTry("PATCH", "/message/" + msgId, { internal: true }),
+    smTry("PUT", "/message/" + msgId, { internal: true })
+  ]).then(function(r) { res.json({ results: r }); });
+});
 
 app.post("/checkin", function(req, res) {
   var b = req.body || {};
