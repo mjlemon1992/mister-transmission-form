@@ -266,6 +266,21 @@
 
 <script>
 var BACKEND = "https://mister-transmission-backend-production.up.railway.app";
+var LOC_NAMES = { reddeer: "Red Deer", kelowna: "Kelowna" };
+var LOC = (function() {
+  try {
+    return (new URLSearchParams(window.location.search).get("loc") || "")
+      .toLowerCase().replace(/[^a-z0-9]/g, "");
+  } catch (e) { return ""; }
+})();
+(function() {
+  var h = document.querySelector(".shop-header");
+  if (!h) return;
+  var el = document.createElement("p");
+  el.style.cssText = "font-size:12px;color:#b8b8b8;margin-top:6px;letter-spacing:0.06em;text-transform:uppercase;";
+  el.textContent = (LOC_NAMES[LOC] || LOC || "Red Deer") + " location";
+  h.appendChild(el);
+})();
 var currentType = "individual";
 
 // Scroll to top on load to hide Safari bar
@@ -410,7 +425,8 @@ function submitForm() {
     color: document.getElementById("color").value,
     vsize: document.getElementById("vsize").value,
     source: document.getElementById("source").value,
-    signature: getSignatureData()
+    signature: getSignatureData(),
+    location: LOC
   };
 
   var xhr = new XMLHttpRequest();

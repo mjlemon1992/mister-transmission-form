@@ -85,6 +85,38 @@ function smRequest(method, apiPath, body) {
 }
 function smPost(apiPath, body) { return smRequest("POST", apiPath, body); }
 
+// --- Locations: discovered from Shopmonkey at startup (self-maintaining) ----
+var LOCATIONS = {};   // slug -> { id, name }
+function slugify(v) { return String(v || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+function loadLocations() {
+  return smRequest("GET", "/location?limit=50").then(function(r) {
+    var list = (r && r.data) || [];
+    var map = {};
+    list.forEach(function(l) {
+      if (!l || !l.id) return;
+      map[slugify(l.name)] = { id: l.id, name: l.name };
+      if (/red\s*deer/i.test(l.name || "")) map.reddeer = { id: l.id, name: l.name };
+      if (/kelowna/i.test(l.name || "")) map.kelowna = { id: l.id, name: l.name };
+    });
+    if (Object.keys(map).length) LOCATIONS = map;
+    console.log("Locations loaded: " + Object.keys(LOCATIONS).map(function(k) {
+      return k + "=" + LOCATIONS[k].name;
+    }).join(", "));
+    return LOCATIONS;
+  }).catch(function(e) {
+    console.error("Location discovery failed (default-location mode):", e && e.message);
+    return LOCATIONS;
+  });
+}
+loadLocations();
+function resolveLocation(raw) {
+  var slug = slugify(raw);
+  if (!slug) return Promise.resolve(null);           // no location requested -> key default
+  if (LOCATIONS[slug]) return Promise.resolve(LOCATIONS[slug]);
+  // Unknown: refresh once (covers a location added after boot), then re-check.
+  return loadLocations().then(function() { return LOCATIONS[slug] || undefined; });
+}
+
 // --- Validation (exported for tests) ---------------------------------------
 function digitsOf(v) { return String(v || "").replace(/\D/g, ""); }
 
@@ -175,7 +207,7 @@ var IDEM_TTL_MS = 10 * 60 * 1000;
 function idemKey(b) {
   return crypto.createHash("sha256").update([
     b.customerType, b.firstName, b.lastName, b.companyName,
-    digitsOf(b.phone), b.year, b.make, b.model
+    digitsOf(b.phone), b.year, b.make, b.model, slugify(b.location)
   ].join("|").toLowerCase()).digest("hex");
 }
 function sweepIdem() {
@@ -237,10 +269,20 @@ app.get("/health", function(req, res) {
 app.get("/status/:orderId", function(req, res) {
   if ((req.query.token || "") !== CHECKIN_TOKEN) return res.status(403).json({ error: "forbidden" });
   smRequest("GET", "/order/" + req.params.orderId).then(function(r) {
-    res.json({ messageCount: r.data && r.data.messageCount, name: r.data && r.data.coalescedName });
+    res.json({
+      messageCount: r.data && r.data.messageCount,
+      name: r.data && r.data.coalescedName,
+      locationId: r.data && r.data.locationId
+    });
   }).catch(function() {
     res.status(502).json({ error: "upstream" });
   });
+});
+
+// Ops helper: the discovered location slug map (token-gated, read-only).
+app.get("/locations", function(req, res) {
+  if ((req.query.token || "") !== CHECKIN_TOKEN) return res.status(403).json({ error: "forbidden" });
+  loadLocations().then(function(map) { res.json(map); });
 });
 
 app.post("/checkin", checkinLimiter, function(req, res) {
@@ -263,32 +305,53 @@ app.post("/checkin", checkinLimiter, function(req, res) {
   }
 
   var customerId, vehicleId, orderId;
-  var step = "customer";
+  var step = "location";
 
-  smPost("/customer", buildCustomerPayload(b))
+  resolveLocation(b.location)
+  .then(function(loc) {
+    if (b.location && loc === undefined) {
+      var err = new Error("Unknown location: " + b.location);
+      err.badRequest = true;
+      throw err;
+    }
+    var locationId = loc && loc.id;
+    step = "customer";
+    var cp = buildCustomerPayload(b);
+    if (locationId) { cp.locationIds = [locationId]; cp.locationId = locationId; }
+    return smPost("/customer", cp).then(function(cd) { return { cd: cd, locationId: locationId }; });
+  })
+  .then(function(ctx) {
+    var cd = ctx.cd;
+    b.__locationId = ctx.locationId;
+    return cd;
+  })
   .then(function(cd) {
     customerId = cd.data && cd.data.id;
     step = "vehicle";
-    return smPost("/vehicle", {
+    var vp = {
       customerId: customerId,
       year: Number(b.year),
       make: b.make,
       model: b.model,
       size: b.vsize || "LightDuty",
       color: b.color || "Other"
-    });
+    };
+    if (b.__locationId) vp.locationId = b.__locationId;
+    return smPost("/vehicle", vp);
   })
   .then(function(vd) {
     vehicleId = vd.data && vd.data.id;
     step = "order";
     var orderName = b.year + " " + b.make + " " + b.model;
     orderName += " - " + (isFleet ? b.companyName : b.firstName + " " + b.lastName);
-    return smPost("/order", {
+    var op = {
       customerId: customerId,
       vehicleId: vehicleId,
       name: orderName,
       statusLabel: "Estimate"
-    });
+    };
+    if (b.__locationId) op.locationId = b.__locationId;
+    return smPost("/order", op);
   })
   .then(function(od) {
     orderId = od.data && od.data.id;
@@ -304,6 +367,9 @@ app.post("/checkin", checkinLimiter, function(req, res) {
       });
   })
   .catch(function(err) {
+    if (err && err.badRequest) {
+      return res.status(400).json({ error: err.message });
+    }
     console.error("CHECKIN FAILED at step '" + step + "':", err && err.message);
     if (customerId && !orderId) {
       console.error("ORPHAN WARNING: customer " + customerId +
