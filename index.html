@@ -274,15 +274,13 @@ window.addEventListener("load", function() {
   initSignature();
 });
 
-var DECLARATION_TEXT = "The vehicle has valid insurance and registration. Any fines linked to no insurance, registration, or illegal modifications will be passed on to the customer. Any vehicle left more than 5 days after completion will be charged $20 per day plus tax, unless otherwise authorized by us.";
-
 // ---- Signature pad ----
 var sigCanvas, sigCtx, sigDrawing = false, sigHasInk = false;
-function initSignature() {
-  sigCanvas = document.getElementById("sig-pad");
-  if (!sigCanvas) return;
+function sizeSigCanvas(preserve) {
+  var prev = (preserve && sigHasInk && sigCanvas.width) ? sigCanvas.toDataURL("image/png") : null;
   var ratio = window.devicePixelRatio || 1;
   var rect = sigCanvas.getBoundingClientRect();
+  if (!rect.width) return;
   sigCanvas.width = Math.round(rect.width * ratio);
   sigCanvas.height = Math.round(rect.height * ratio);
   sigCtx = sigCanvas.getContext("2d");
@@ -291,6 +289,23 @@ function initSignature() {
   sigCtx.lineCap = "round";
   sigCtx.lineJoin = "round";
   sigCtx.strokeStyle = "#111";
+  if (prev) {
+    var img = new Image();
+    img.onload = function() { sigCtx.drawImage(img, 0, 0, rect.width, rect.height); };
+    img.src = prev;
+  }
+}
+var sigResizeTimer = null;
+function onSigResize() {
+  clearTimeout(sigResizeTimer);
+  sigResizeTimer = setTimeout(function() { sizeSigCanvas(true); }, 250);
+}
+function initSignature() {
+  sigCanvas = document.getElementById("sig-pad");
+  if (!sigCanvas) return;
+  sizeSigCanvas(false);
+  window.addEventListener("resize", onSigResize);
+  window.addEventListener("orientationchange", onSigResize);
   function pos(e) {
     var r = sigCanvas.getBoundingClientRect();
     var t = (e.touches && e.touches[0]) ? e.touches[0] : e;
@@ -334,6 +349,7 @@ function validate() {
   }
   function notEmpty(v) { return v.trim().length > 0; }
   function validEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+  function validPhone(v) { var d = v.replace(/\D/g, ""); return d.length >= 10 && d.length <= 11; }
   function validYear(v) { return /^\d{4}$/.test(v.trim()); }
   function selected(v) { return v !== ""; }
 
@@ -348,7 +364,7 @@ function validate() {
   check("f-address", "address", notEmpty);
   check("f-city", "city", notEmpty);
   check("f-postcode", "postcode", notEmpty);
-  check("f-phone", "phone", notEmpty);
+  check("f-phone", "phone", validPhone);
   check("f-email", "email", validEmail);
   check("f-year", "year", validYear);
   check("f-make", "make", notEmpty);
@@ -394,13 +410,13 @@ function submitForm() {
     color: document.getElementById("color").value,
     vsize: document.getElementById("vsize").value,
     source: document.getElementById("source").value,
-    signature: getSignatureData(),
-    declaration: DECLARATION_TEXT
+    signature: getSignatureData()
   };
 
   var xhr = new XMLHttpRequest();
   xhr.open("POST", BACKEND + "/checkin", true);
   xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Checkin-Token", "mt-checkin-7f3a");
   xhr.onload = function() {
     try {
       var data = JSON.parse(xhr.responseText);
