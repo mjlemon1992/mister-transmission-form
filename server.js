@@ -9,6 +9,8 @@ app.set("trust proxy", 1); // Railway sits behind a proxy
 
 // --- Config -----------------------------------------------------------------
 var SM_API_KEY = (process.env.SM_API_KEY || "").trim();
+// Kelowna runs its own separate Shopmonkey account -> its own API key.
+var SM_API_KEY_KELOWNA = (process.env.SM_API_KEY_KELOWNA || "").trim();
 var SM_BASE = "api.shopmonkey.cloud";
 var PORT = process.env.PORT || 3000;
 
@@ -49,7 +51,7 @@ app.use(cors({
 app.use(express.json({ limit: "1mb" }));
 
 // --- Shopmonkey client ------------------------------------------------------
-function smRequest(method, apiPath, body) {
+function smRequest(method, apiPath, body, apiKey) {
   return new Promise(function(resolve, reject) {
     var data = body ? JSON.stringify(body) : "";
     var options = {
@@ -58,7 +60,7 @@ function smRequest(method, apiPath, body) {
       path: "/v3" + apiPath,
       method: method,
       headers: {
-        "Authorization": "Bearer " + SM_API_KEY,
+        "Authorization": "Bearer " + (apiKey || SM_API_KEY),
         "Content-Type": "application/json",
         "Content-Length": Buffer.byteLength(data)
       }
@@ -83,7 +85,7 @@ function smRequest(method, apiPath, body) {
     req.end();
   });
 }
-function smPost(apiPath, body) { return smRequest("POST", apiPath, body); }
+function smPost(apiPath, body, apiKey) { return smRequest("POST", apiPath, body, apiKey); }
 
 // --- Locations: discovered from Shopmonkey at startup (self-maintaining) ----
 var LOCATIONS = {};   // slug -> { id, name }
@@ -109,12 +111,33 @@ function loadLocations() {
   });
 }
 loadLocations();
+// Locations that live in their OWN Shopmonkey account (separate API key).
+var KEYED_LOCATIONS = {
+  kelowna: { name: "Kelowna", envVar: "SM_API_KEY_KELOWNA", getKey: function() { return SM_API_KEY_KELOWNA; } }
+};
+// Resolves a location slug to { key, locationId?, name }.
+// - no slug / reddeer  -> default key (Red Deer account)
+// - keyed location     -> its own API key (400 with a clear message if unconfigured)
+// - discovered location-> default key + locationId within this account
 function resolveLocation(raw) {
   var slug = slugify(raw);
-  if (!slug) return Promise.resolve(null);           // no location requested -> key default
-  if (LOCATIONS[slug]) return Promise.resolve(LOCATIONS[slug]);
+  if (!slug || slug === "reddeer") return Promise.resolve({ key: SM_API_KEY, name: "Red Deer" });
+  if (KEYED_LOCATIONS[slug]) {
+    var kl = KEYED_LOCATIONS[slug];
+    var k = kl.getKey();
+    if (!k) {
+      var e = new Error(kl.name + " is not set up yet — the " + kl.envVar + " variable must be added on Railway.");
+      e.badRequest = true;
+      return Promise.reject(e);
+    }
+    return Promise.resolve({ key: k, name: kl.name });
+  }
+  if (LOCATIONS[slug]) return Promise.resolve({ key: SM_API_KEY, locationId: LOCATIONS[slug].id, name: LOCATIONS[slug].name });
   // Unknown: refresh once (covers a location added after boot), then re-check.
-  return loadLocations().then(function() { return LOCATIONS[slug] || undefined; });
+  return loadLocations().then(function() {
+    if (LOCATIONS[slug]) return { key: SM_API_KEY, locationId: LOCATIONS[slug].id, name: LOCATIONS[slug].name };
+    return undefined;
+  });
 }
 
 // --- Validation (exported for tests) ---------------------------------------
@@ -177,13 +200,13 @@ function attachDeclaration(orderId, customerId, b, isFleet) {
     sendEmail: false,
     sendSms: false,
     contentType: "PlainText"
-  });
+  }, b.__locKey);
 }
 
 // Shopmonkey's API has no file-upload endpoint, so the signature image is
 // persisted as a data URL inside a second internal note on the order.
 // To view it: copy the data:image/png... line into a browser address bar.
-function storeSignature(orderId, customerId, sig) {
+function storeSignature(orderId, customerId, sig, apiKey) {
   if (!orderId || !customerId) return Promise.resolve();
   if (!sig || sig.indexOf("data:image/png;base64,") !== 0) return Promise.resolve();
   if (sig.length > 400000) {
@@ -198,7 +221,7 @@ function storeSignature(orderId, customerId, sig) {
     sendEmail: false,
     sendSms: false,
     contentType: "PlainText"
-  });
+  }, apiKey);
 }
 
 // --- Idempotency: same person+vehicle within 10 min returns the same order --
@@ -254,11 +277,14 @@ app.get("/", function(req, res) {
 
 app.get("/health", function(req, res) {
   if (req.query.deep === "1") {
-    // Deep check: verify the Shopmonkey key actually works.
-    smRequest("GET", "/message?limit=1").then(function() {
-      res.json({ status: "ok", shopmonkey: "ok" });
-    }).catch(function(e) {
-      res.status(502).json({ status: "degraded", shopmonkey: "failing", detail: String(e.message).slice(0, 200) });
+    // Deep check: verify each configured Shopmonkey key actually works.
+    var checks = [smRequest("GET", "/message?limit=1").then(function() { return "ok"; }, function(e) { return "failing: " + String(e.message).slice(0, 120); })];
+    checks.push(SM_API_KEY_KELOWNA
+      ? smRequest("GET", "/message?limit=1", null, SM_API_KEY_KELOWNA).then(function() { return "ok"; }, function(e) { return "failing: " + String(e.message).slice(0, 120); })
+      : Promise.resolve("not configured"));
+    Promise.all(checks).then(function(r) {
+      var degraded = /failing/.test(r[0]) || /failing/.test(r[1]);
+      res.status(degraded ? 502 : 200).json({ status: degraded ? "degraded" : "ok", reddeer: r[0], kelowna: r[1] });
     });
   } else {
     res.json({ status: "ok", smKeyPresent: !!SM_API_KEY });
@@ -268,7 +294,9 @@ app.get("/health", function(req, res) {
 // Ops helper: check a specific order's note count (token-gated, read-only).
 app.get("/status/:orderId", function(req, res) {
   if ((req.query.token || "") !== CHECKIN_TOKEN) return res.status(403).json({ error: "forbidden" });
-  smRequest("GET", "/order/" + req.params.orderId).then(function(r) {
+  var kl = KEYED_LOCATIONS[slugify(req.query.loc)];
+  var key = (kl && kl.getKey()) || SM_API_KEY;
+  smRequest("GET", "/order/" + req.params.orderId, null, key).then(function(r) {
     res.json({
       messageCount: r.data && r.data.messageCount,
       name: r.data && r.data.coalescedName,
@@ -282,7 +310,13 @@ app.get("/status/:orderId", function(req, res) {
 // Ops helper: the discovered location slug map (token-gated, read-only).
 app.get("/locations", function(req, res) {
   if ((req.query.token || "") !== CHECKIN_TOKEN) return res.status(403).json({ error: "forbidden" });
-  loadLocations().then(function(map) { res.json(map); });
+  loadLocations().then(function(map) {
+    var keyed = {};
+    Object.keys(KEYED_LOCATIONS).forEach(function(k) {
+      keyed[k] = { name: KEYED_LOCATIONS[k].name, configured: !!KEYED_LOCATIONS[k].getKey() };
+    });
+    res.json({ discovered: map, separateAccounts: keyed });
+  });
 });
 
 app.post("/checkin", checkinLimiter, function(req, res) {
@@ -309,21 +343,17 @@ app.post("/checkin", checkinLimiter, function(req, res) {
 
   resolveLocation(b.location)
   .then(function(loc) {
-    if (b.location && loc === undefined) {
+    if (loc === undefined) {
       var err = new Error("Unknown location: " + b.location);
       err.badRequest = true;
       throw err;
     }
-    var locationId = loc && loc.id;
+    b.__locKey = loc.key;
+    b.__locationId = loc.locationId;
     step = "customer";
     var cp = buildCustomerPayload(b);
-    if (locationId) { cp.locationIds = [locationId]; cp.locationId = locationId; }
-    return smPost("/customer", cp).then(function(cd) { return { cd: cd, locationId: locationId }; });
-  })
-  .then(function(ctx) {
-    var cd = ctx.cd;
-    b.__locationId = ctx.locationId;
-    return cd;
+    if (b.__locationId) { cp.locationIds = [b.__locationId]; cp.locationId = b.__locationId; }
+    return smPost("/customer", cp, b.__locKey);
   })
   .then(function(cd) {
     customerId = cd.data && cd.data.id;
@@ -337,7 +367,7 @@ app.post("/checkin", checkinLimiter, function(req, res) {
       color: b.color || "Other"
     };
     if (b.__locationId) vp.locationId = b.__locationId;
-    return smPost("/vehicle", vp);
+    return smPost("/vehicle", vp, b.__locKey);
   })
   .then(function(vd) {
     vehicleId = vd.data && vd.data.id;
@@ -351,7 +381,7 @@ app.post("/checkin", checkinLimiter, function(req, res) {
       statusLabel: "Estimate"
     };
     if (b.__locationId) op.locationId = b.__locationId;
-    return smPost("/order", op);
+    return smPost("/order", op, b.__locKey);
   })
   .then(function(od) {
     orderId = od.data && od.data.id;
@@ -361,7 +391,7 @@ app.post("/checkin", checkinLimiter, function(req, res) {
     // Record declaration + signature after responding, so a failure here can
     // never block the customer's check-in.
     attachDeclaration(orderId, customerId, b, isFleet)
-      .then(function() { return storeSignature(orderId, customerId, b.signature); })
+      .then(function() { return storeSignature(orderId, customerId, b.signature, b.__locKey); })
       .catch(function(e) {
         console.error("declaration/signature recording failed for order " + orderId + ":", e && e.message);
       });
