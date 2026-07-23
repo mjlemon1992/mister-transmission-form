@@ -4,9 +4,6 @@ var https = require("https");
 var path = require("path");
 var crypto = require("crypto");
 var fs = require("fs");
-var rateLimit = require("express-rate-limit");
-if (rateLimit && rateLimit.rateLimit) rateLimit = rateLimit.rateLimit;
-
 var app = express();
 app.set("trust proxy", 1); // Railway sits behind a proxy
 
@@ -189,13 +186,26 @@ function sweepIdem() {
 }
 
 // --- Rate limit: plenty for a busy shop day, hostile to floods ---------------
-var checkinLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many submissions from this connection — please ask a team member for help." }
-});
+// Dependency-free sliding-window limiter (30 requests / hour / IP).
+var RL_WINDOW_MS = 60 * 60 * 1000;
+var RL_MAX = 30;
+var rlHits = new Map();
+function checkinLimiter(req, res, next) {
+  var ip = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "?")
+    .split(",")[0].trim();
+  var now = Date.now();
+  var hits = (rlHits.get(ip) || []).filter(function(t) { return now - t < RL_WINDOW_MS; });
+  if (hits.length >= RL_MAX) {
+    return res.status(429).json({ error: "Too many submissions from this connection — please ask a team member for help." });
+  }
+  hits.push(now);
+  rlHits.set(ip, hits);
+  if (rlHits.size > 5000) { // safety valve: never grow unbounded
+    var cutoff = now - RL_WINDOW_MS;
+    rlHits.forEach(function(v, k) { if (!v.length || v[v.length - 1] < cutoff) rlHits.delete(k); });
+  }
+  next();
+}
 
 // --- Routes -----------------------------------------------------------------
 var INDEX_PATH = fs.existsSync(path.join(__dirname, "index.html"))
