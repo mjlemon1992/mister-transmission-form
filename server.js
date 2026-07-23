@@ -319,34 +319,6 @@ if (process.env.VOIP_ENABLED === "1" && fs.existsSync(path.join(__dirname, "voip
   require("./voip").start(app);
 }
 
-// TEMPORARY note-endpoint discovery — remove after wiring real Notes.
-function smTry2(method, apiPath, body) {
-  return smRequest(method, apiPath, body).then(
-    function(r) { return { ok: true, m: method, p: apiPath, data: r && r.data }; },
-    function(e) { return { ok: false, m: method, p: apiPath, err: String(e.message).slice(0, 220) }; }
-  );
-}
-app.get("/__np", function(req, res) {
-  if (req.query.t !== "np-x9q4w") return res.status(403).json({ error: "no" });
-  var oid = req.query.orderId;
-  var txt = "DIAG note probe " + Date.now();
-  Promise.all([
-    smTry2("GET", "/note?limit=2"),
-    smTry2("GET", "/notes?limit=2"),
-    smTry2("GET", "/order_note?limit=2"),
-    smTry2("GET", "/order/" + oid + "/note"),
-    smTry2("GET", "/order/" + oid + "/notes"),
-    smTry2("POST", "/note", { orderId: oid, text: txt }),
-    smTry2("POST", "/order/" + oid + "/note", { text: txt }),
-    smTry2("POST", "/order/" + oid + "/notes", { text: txt })
-  ]).then(function(r) {
-    r.forEach(function(x) {
-      if (x.ok && Array.isArray(x.data) && x.data[0]) x.data = { firstKeys: Object.keys(x.data[0]) };
-    });
-    res.json(r);
-  });
-});
-
 if (require.main === module) {
   app.listen(PORT, function() {
     console.log("Server running on port " + PORT);
