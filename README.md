@@ -26,3 +26,4 @@ cleaner split (form here, backend there), re-point the Railway service **Source*
   Shopmonkey — it rejects them. Send `companyName` only. (`server.js` handles this.)
 - `.nojekyll` keeps GitHub Pages serving `index.html` as-is.
 - Express **4** only (Express 5 breaks wildcard routes).
+
