@@ -91,12 +91,12 @@
       <div class="field-grid two">
         <div class="field" id="f-firstname">
           <label for="firstname">First name *</label>
-          <input type="text" id="firstname" placeholder="John" autocomplete="given-name">
+          <input type="text" id="firstname" placeholder="John" autocomplete="given-name" autocapitalize="words">
           <span class="error-msg">Please enter your first name</span>
         </div>
         <div class="field" id="f-lastname">
           <label for="lastname">Last name *</label>
-          <input type="text" id="lastname" placeholder="Smith" autocomplete="family-name">
+          <input type="text" id="lastname" placeholder="Smith" autocomplete="family-name" autocapitalize="words">
           <span class="error-msg">Please enter your last name</span>
         </div>
       </div>
@@ -114,12 +114,12 @@
       <div class="field-grid two">
         <div class="field" id="f-firstname-fleet">
           <label for="firstname-fleet">Contact first name *</label>
-          <input type="text" id="firstname-fleet" placeholder="John" autocomplete="given-name">
+          <input type="text" id="firstname-fleet" placeholder="John" autocomplete="given-name" autocapitalize="words">
           <span class="error-msg">Please enter first name</span>
         </div>
         <div class="field" id="f-lastname-fleet">
           <label for="lastname-fleet">Contact last name *</label>
-          <input type="text" id="lastname-fleet" placeholder="Smith" autocomplete="family-name">
+          <input type="text" id="lastname-fleet" placeholder="Smith" autocomplete="family-name" autocapitalize="words">
           <span class="error-msg">Please enter last name</span>
         </div>
       </div>
@@ -135,12 +135,12 @@
     <div class="field-grid two">
       <div class="field" id="f-city">
         <label for="city">City / suburb *</label>
-        <input type="text" id="city" placeholder="Springfield" autocomplete="address-level2">
+        <input type="text" id="city" placeholder="Springfield" autocomplete="address-level2" autocapitalize="words">
         <span class="error-msg">Please enter your city</span>
       </div>
       <div class="field" id="f-postcode">
         <label for="postcode">Postcode *</label>
-        <input type="text" id="postcode" placeholder="A1A 1A1" autocomplete="postal-code">
+        <input type="text" id="postcode" placeholder="A1A 1A1" autocomplete="postal-code" autocapitalize="characters">
         <span class="error-msg">Please enter your postcode</span>
       </div>
     </div>
@@ -167,16 +167,17 @@
       </div>
       <div class="field" id="f-make">
         <label for="make">Make *</label>
-        <input type="text" id="make" placeholder="Toyota">
+        <input type="text" id="make" placeholder="Toyota" list="make-list" autocapitalize="words" autocomplete="off">
+        <datalist id="make-list"><option>Acura</option><option>Audi</option><option>BMW</option><option>Buick</option><option>Cadillac</option><option>Chevrolet</option><option>Chrysler</option><option>Dodge</option><option>Ford</option><option>GMC</option><option>Honda</option><option>Hyundai</option><option>Infiniti</option><option>Jeep</option><option>Kia</option><option>Land Rover</option><option>Lexus</option><option>Lincoln</option><option>Mazda</option><option>Mercedes-Benz</option><option>Mini</option><option>Mitsubishi</option><option>Nissan</option><option>Ram</option><option>Subaru</option><option>Toyota</option><option>Volkswagen</option><option>Volvo</option></datalist>
         <span class="error-msg">Required</span>
       </div>
       <div class="field" id="f-model">
         <label for="model">Model *</label>
-        <input type="text" id="model" placeholder="Camry">
+        <input type="text" id="model" placeholder="Camry" autocapitalize="words">
         <span class="error-msg">Required</span>
       </div>
       <div class="field" id="f-color">
-        <label for="color">Colour *</label>
+        <label for="color">Colour</label>
         <select id="color">
           <option value="">Select</option>
           <option value="White">White</option>
@@ -237,8 +238,12 @@
         <li>Any vehicle left more than 5 days after completion will be charged $20 per day plus tax, unless otherwise authorized by us.</li>
       </ul>
       <p class="sig-label">Please sign below to confirm you have read and agree to the above *</p>
-      <div class="sig-wrap" id="f-signature">
+      <div class="sig-wrap" id="f-signature" style="position:relative;">
         <canvas id="sig-pad" class="sig-pad"></canvas>
+        <div id="sig-watermark" style="position:absolute;left:24px;right:24px;bottom:46px;pointer-events:none;">
+          <div style="border-top:1px solid #e0e0e0;"></div>
+          <div style="text-align:center;color:#c4c4c4;font-size:14px;margin-top:6px;">&#10005; Sign here</div>
+        </div>
         <div class="sig-row">
           <span class="sig-hint">Sign with your finger or stylus</span>
           <button type="button" class="sig-clear" onclick="clearSignature()">Clear</button>
@@ -327,7 +332,7 @@ function initSignature() {
     return { x: t.clientX - r.left, y: t.clientY - r.top };
   }
   function start(e) { e.preventDefault(); sigDrawing = true; var p = pos(e); sigCtx.beginPath(); sigCtx.moveTo(p.x, p.y); }
-  function move(e) { if (!sigDrawing) return; e.preventDefault(); var p = pos(e); sigCtx.lineTo(p.x, p.y); sigCtx.stroke(); sigHasInk = true; var w = document.getElementById("f-signature"); if (w) w.classList.remove("invalid"); }
+  function move(e) { if (!sigDrawing) return; e.preventDefault(); var p = pos(e); sigCtx.lineTo(p.x, p.y); sigCtx.stroke(); sigHasInk = true; var w = document.getElementById("f-signature"); if (w) w.classList.remove("invalid"); var wm = document.getElementById("sig-watermark"); if (wm) wm.style.display = "none"; }
   function end() { sigDrawing = false; }
   sigCanvas.addEventListener("mousedown", start);
   sigCanvas.addEventListener("mousemove", move);
@@ -340,6 +345,7 @@ function clearSignature() {
   if (!sigCtx) return;
   sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
   sigHasInk = false;
+  var wm = document.getElementById("sig-watermark"); if (wm) wm.style.display = "block";
 }
 function getSignatureData() {
   return (sigHasInk && sigCanvas) ? sigCanvas.toDataURL("image/png") : "";
@@ -355,11 +361,12 @@ function setType(type) {
 
 function validate() {
   var ok = true;
+  var firstBad = null;
   function check(wrapperId, inputId, fn) {
     var el = document.getElementById(inputId);
     var wrap = document.getElementById(wrapperId);
     if (!wrap || !el) return;
-    if (!fn(el.value)) { wrap.classList.add("invalid"); ok = false; }
+    if (!fn(el.value)) { wrap.classList.add("invalid"); ok = false; if (!firstBad) firstBad = wrap; }
     else { wrap.classList.remove("invalid"); }
   }
   function notEmpty(v) { return v.trim().length > 0; }
@@ -384,21 +391,29 @@ function validate() {
   check("f-year", "year", validYear);
   check("f-make", "make", notEmpty);
   check("f-model", "model", notEmpty);
-  check("f-color", "color", selected);
   check("f-source", "source", selected);
 
-  if (!sigHasInk) { document.getElementById("f-signature").classList.add("invalid"); ok = false; }
+  if (!sigHasInk) { var sw = document.getElementById("f-signature"); sw.classList.add("invalid"); ok = false; if (!firstBad) firstBad = sw; }
   else { document.getElementById("f-signature").classList.remove("invalid"); }
+  window.__firstBad = firstBad;
   return ok;
 }
 
 function submitForm() {
-  if (!validate()) return;
+  if (!validate()) {
+    var fb = window.__firstBad;
+    if (fb) {
+      fb.scrollIntoView({ behavior: "smooth", block: "center" });
+      var inp = fb.querySelector("input, select");
+      if (inp) { try { inp.focus({ preventScroll: true }); } catch(e) {} }
+    }
+    return;
+  }
   var btn = document.getElementById("submit-btn");
   var bar = document.getElementById("status-bar");
   btn.disabled = true;
   bar.className = "status-bar sending";
-  bar.textContent = "Sending to Shopmonkey...";
+  bar.textContent = "Checking you in\u2026";
 
   var firstName = currentType === "individual"
     ? document.getElementById("firstname").value.trim()
@@ -442,9 +457,12 @@ function submitForm() {
         "We have received your details, " + displayName + ".";
       document.getElementById("main-form").style.display = "none";
       document.getElementById("success-card").classList.add("show");
+      window.scrollTo(0, 0);
+      clearTimeout(window.__successReset);
+      window.__successReset = setTimeout(function() { resetForm(); window.scrollTo(0, 0); }, 25000);
     } catch(e) {
       bar.className = "status-bar error";
-      bar.textContent = "Something went wrong: " + e.message;
+      bar.textContent = "Sorry \u2014 that didn't go through. Please ask a team member for help.";
       btn.disabled = false;
     }
   };
@@ -478,6 +496,47 @@ function resetForm() {
   document.getElementById("main-form").style.display = "block";
   document.getElementById("success-card").classList.remove("show");
 }
+
+// Kiosk hygiene: clear a half-filled form after 2 min of no interaction so the
+// next customer never sees the previous person's details.
+var __idle = null;
+function __resetIdle() {
+  clearTimeout(__idle);
+  __idle = setTimeout(function() { resetForm(); window.scrollTo(0, 0); }, 120000);
+}
+["touchstart", "keydown", "mousedown", "input"].forEach(function(ev) {
+  document.addEventListener(ev, __resetIdle, { passive: true });
+});
+__resetIdle();
+
+// Clear a field's error state as soon as the customer starts fixing it.
+document.addEventListener("input", function(e) {
+  var w = e.target.closest && e.target.closest(".field, .sig-wrap");
+  if (w) w.classList.remove("invalid");
+});
+
+// Live input formatting for cleaner records + fewer POS rejections.
+(function() {
+  function digits(v) { return v.replace(/\D/g, ""); }
+  var phone = document.getElementById("phone");
+  if (phone) phone.addEventListener("input", function() {
+    var d = digits(this.value).slice(0, 10), out = d;
+    if (d.length > 6) out = "(" + d.slice(0,3) + ") " + d.slice(3,6) + "-" + d.slice(6);
+    else if (d.length > 3) out = "(" + d.slice(0,3) + ") " + d.slice(3);
+    else if (d.length > 0) out = "(" + d;
+    this.value = out;
+  });
+  var pc = document.getElementById("postcode");
+  if (pc) pc.addEventListener("input", function() {
+    var s = this.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+    this.value = s.length > 3 ? s.slice(0,3) + " " + s.slice(3) : s;
+  });
+  function titleCase(v) { return v.replace(/\S+/g, function(w) { return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); }); }
+  ["firstname","lastname","firstname-fleet","lastname-fleet","city"].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener("blur", function() { if (this.value) this.value = titleCase(this.value.trim()); });
+  });
+})();
 </script>
 
 <div id="afterhours" style="position:fixed;inset:0;background:#000;z-index:2147483647;display:none;-webkit-tap-highlight-color:transparent;">
