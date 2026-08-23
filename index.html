@@ -479,6 +479,50 @@ function resetForm() {
   document.getElementById("success-card").classList.remove("show");
 }
 </script>
+
+<div id="afterhours" style="position:fixed;inset:0;background:#000;z-index:2147483647;display:none;-webkit-tap-highlight-color:transparent;">
+  <div id="ah-pin" style="position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;">
+    <input id="ah-pin-input" type="tel" inputmode="numeric" maxlength="4" placeholder="PIN" autocomplete="off" style="font-size:28px;letter-spacing:12px;text-align:center;width:210px;padding:14px;border-radius:12px;border:1px solid #333;background:#111;color:#fff;outline:none;">
+    <div style="color:#555;font-size:12px;">Staff PIN to reopen</div>
+  </div>
+</div>
+<script>
+(function(){
+  var q = new URLSearchParams(location.search);
+  var OPEN = parseFloat(q.get("open"));  if (isNaN(OPEN))  OPEN = 8;    // 8:00am
+  var CLOSE = parseFloat(q.get("close")); if (isNaN(CLOSE)) CLOSE = 19;  // 7:00pm
+  var PIN = (q.get("pin") || "2468");
+  var ah = document.getElementById("afterhours");
+  var pb = document.getElementById("ah-pin");
+  var pi = document.getElementById("ah-pin-input");
+  if (!ah) return;
+  var bypass = false, holdTimer = null, pinTimer = null;
+  function within() {
+    var d = new Date(); var h = d.getHours() + d.getMinutes() / 60;
+    return OPEN <= CLOSE ? (h >= OPEN && h < CLOSE) : (h >= OPEN || h < CLOSE);
+  }
+  function apply() {
+    if (within()) { bypass = false; ah.style.display = "none"; pb.style.display = "none"; pi.value = ""; return; }
+    if (bypass) { ah.style.display = "none"; return; }
+    ah.style.display = "block";
+  }
+  function showPin() { pb.style.display = "flex"; pi.value = ""; try { pi.focus(); } catch(e){} clearTimeout(pinTimer); pinTimer = setTimeout(function(){ pb.style.display = "none"; }, 15000); }
+  function press() { holdTimer = setTimeout(showPin, 2000); }   // 2s hold reveals staff PIN
+  function release() { clearTimeout(holdTimer); }
+  ah.addEventListener("touchstart", press, { passive: true });
+  ah.addEventListener("touchend", release);
+  ah.addEventListener("touchcancel", release);
+  ah.addEventListener("mousedown", press);
+  ah.addEventListener("mouseup", release);
+  pi.addEventListener("input", function() {
+    if (pi.value === PIN) { bypass = true; pb.style.display = "none"; pi.value = ""; apply(); }
+    else if (pi.value.length >= 4) { pi.value = ""; }
+  });
+  apply();
+  setInterval(apply, 15000);
+  document.addEventListener("visibilitychange", function() { if (!document.hidden) apply(); });
+})();
+</script>
 </body>
 </html>
 
