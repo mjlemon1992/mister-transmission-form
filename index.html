@@ -601,7 +601,7 @@ document.addEventListener("input", function(e) {
         else { pi.value = ""; }
       };
       x.onerror = function() { pi.value = ""; };
-      x.send(JSON.stringify({ pin: val }));
+      x.send(JSON.stringify({ pin: val, loc: (typeof LOC !== "undefined" ? LOC : "") }));
     } else {
       if (val === PIN) { bypass = true; pb.style.display = "none"; pi.value = ""; apply(); }
       else { pi.value = ""; }
@@ -622,7 +622,7 @@ document.addEventListener("input", function(e) {
   var INP = document.getElementById("pin-gate-input");
   var BTN = document.getElementById("pin-gate-btn");
   var ERR = document.getElementById("pin-gate-err");
-  var KEY = "mt_checkin_pin";
+  var KEY = "mt_checkin_pin_" + ((typeof LOC !== "undefined" && LOC) ? LOC : "default");
   function show(){ GATE.style.display = "flex"; try{ INP.focus(); }catch(e){} }
   function hide(){ GATE.style.display = "none"; ERR.textContent = ""; INP.value = ""; }
   window.__getPin = function(){ try { return localStorage.getItem(KEY) || ""; } catch(e){ return ""; } };
@@ -641,14 +641,14 @@ document.addEventListener("input", function(e) {
       else { ERR.textContent = "Incorrect PIN."; INP.value = ""; try{ INP.focus(); }catch(e){} }
     };
     x.onerror = function(){ ERR.textContent = "Connection error \u2014 try again."; };
-    x.send(JSON.stringify({ pin: pin }));
+    x.send(JSON.stringify({ pin: pin, loc: (typeof LOC !== "undefined" ? LOC : "") }));
   }
   BTN.addEventListener("click", verify);
   INP.addEventListener("keydown", function(e){ if (e.key === "Enter") verify(); });
   INP.addEventListener("input", function(){ if (ERR.textContent && ERR.textContent.indexOf("Checking") < 0) ERR.textContent = ""; });
   // Ask the server whether a PIN is required for this deployment.
   var c = new XMLHttpRequest();
-  c.open("GET", BACKEND + "/config", true);
+  c.open("GET", BACKEND + "/config?loc=" + encodeURIComponent(typeof LOC !== "undefined" ? LOC : ""), true);
   c.onload = function(){ try { var cfg = JSON.parse(c.responseText); window.__pinRequired = !!cfg.pinRequired; if (cfg.pinRequired && !window.__getPin()) show(); } catch(e){} };
   c.send();
 })();

@@ -23,7 +23,14 @@ var CHECKIN_TOKEN = (process.env.CHECKIN_TOKEN || "mt-checkin-7f3a").trim();
 // Optional device-access PIN. Set CHECKIN_PIN in Railway to require a one-time PIN
 // per device (remembered client-side) before the form loads AND on every /checkin.
 // Empty = gate disabled (form behaves exactly as before).
-var CHECKIN_PIN = (process.env.CHECKIN_PIN || "").trim();
+var CHECKIN_PIN = (process.env.CHECKIN_PIN || "").trim();                 // Red Deer / default location
+var CHECKIN_PIN_KELOWNA = (process.env.CHECKIN_PIN_KELOWNA || "").trim();  // Kelowna (its own PIN)
+// Which access PIN applies for a given location slug ("" = no gate for that location).
+function pinForLoc(raw) {
+  var slug = (raw || "").toString().toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (slug === "kelowna") return CHECKIN_PIN_KELOWNA;
+  return CHECKIN_PIN;
+}
 
 // Server-authoritative declaration text. The client displays a copy, but THIS
 // is what gets recorded — the client cannot alter the recorded declaration.
@@ -346,14 +353,15 @@ app.get("/locations", function(req, res) {
 
 // Public: does this deployment require a device-access PIN? (boolean only \u2014 never the PIN itself)
 app.get("/config", function(req, res) {
-  res.json({ pinRequired: !!CHECKIN_PIN });
+  res.json({ pinRequired: !!pinForLoc(req.query.loc) });
 });
 
 // Verify a device-access PIN server-side. The real PIN lives only in CHECKIN_PIN (env), never in the page.
 app.post("/unlock", unlockLimiter, function(req, res) {
-  if (!CHECKIN_PIN) return res.json({ ok: true });                       // gate disabled
+  var required = pinForLoc(req.body && req.body.loc);
+  if (!required) return res.json({ ok: true });                          // gate disabled for this location
   var pin = ((req.body && req.body.pin) || "").toString().trim();
-  if (pin && pin === CHECKIN_PIN) return res.json({ ok: true });
+  if (pin && pin === required) return res.json({ ok: true });
   return res.status(401).json({ error: "Incorrect PIN" });
 });
 
@@ -361,7 +369,8 @@ app.post("/checkin", checkinLimiter, function(req, res) {
   if ((req.headers["x-checkin-token"] || "") !== CHECKIN_TOKEN) {
     return res.status(403).json({ error: "Unauthorized" });
   }
-  if (CHECKIN_PIN && (req.headers["x-checkin-pin"] || "").toString().trim() !== CHECKIN_PIN) {
+  var reqPin = pinForLoc(req.body && req.body.location);
+  if (reqPin && (req.headers["x-checkin-pin"] || "").toString().trim() !== reqPin) {
     return res.status(401).json({ error: "This device is not authorized. Please enter the access PIN." });
   }
   var b = req.body || {};
