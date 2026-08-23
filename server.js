@@ -366,6 +366,7 @@ app.post("/checkin", checkinLimiter, function(req, res) {
       size: b.vsize || "LightDuty",
       color: b.color || "Other"
     };
+    if (b.plate && b.plate.trim()) vp.licensePlate = b.plate.trim().toUpperCase();
     if (b.__locationId) vp.locationId = b.__locationId;
     return smPost("/vehicle", vp, b.__locKey);
   })

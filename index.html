@@ -201,13 +201,9 @@
       </div>
     </div>
     <div class="field-grid two">
-      <div class="field" id="f-vsize">
-        <label for="vsize">Vehicle size *</label>
-        <select id="vsize">
-          <option value="LightDuty">Light duty (car / SUV)</option>
-          <option value="HeavyDuty">Heavy duty (truck / commercial)</option>
-          <option value="Other">Other</option>
-        </select>
+      <div class="field" id="f-plate">
+        <label for="plate">Licence plate</label>
+        <input type="text" id="plate" placeholder="ABC 123" autocapitalize="characters" autocomplete="off" maxlength="10">
       </div>
       <div class="field" id="f-source">
         <label for="source">How did you hear about us?</label>
@@ -435,7 +431,7 @@ function submitForm() {
     make: document.getElementById("make").value.trim(),
     model: document.getElementById("model").value.trim(),
     color: document.getElementById("color").value,
-    vsize: document.getElementById("vsize").value,
+    plate: document.getElementById("plate").value.trim().toUpperCase(),
     source: document.getElementById("source").value,
     signature: getSignatureData(),
     location: LOC
@@ -475,11 +471,10 @@ function confirmClear() { if (window.confirm("Clear all the information entered 
 
 function clearForm() {
   ["firstname","lastname","companyname","firstname-fleet","lastname-fleet",
-   "address","city","postcode","phone","email","year","make","model"]
+   "address","city","postcode","phone","email","year","make","model","plate"]
     .forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ""; });
   document.getElementById("source").value = "";
   document.getElementById("color").value = "";
-  document.getElementById("vsize").value = "LightDuty";
   clearSignature();
   var sigW = document.getElementById("f-signature"); if (sigW) sigW.classList.remove("invalid");
   document.querySelectorAll(".field").forEach(function(f) { f.classList.remove("invalid"); });
