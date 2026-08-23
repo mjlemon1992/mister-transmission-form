@@ -296,11 +296,18 @@ app.get("/status/:orderId", function(req, res) {
   if ((req.query.token || "") !== CHECKIN_TOKEN) return res.status(403).json({ error: "forbidden" });
   var kl = KEYED_LOCATIONS[slugify(req.query.loc)];
   var key = (kl && kl.getKey()) || SM_API_KEY;
+  var order;
   smRequest("GET", "/order/" + req.params.orderId, null, key).then(function(r) {
+    order = r.data || {};
+    var vid = order.vehicleId;
+    if (!vid) return null;
+    return smRequest("GET", "/vehicle/" + vid, null, key).catch(function() { return null; });
+  }).then(function(vr) {
     res.json({
-      messageCount: r.data && r.data.messageCount,
-      name: r.data && r.data.coalescedName,
-      locationId: r.data && r.data.locationId
+      messageCount: order.messageCount,
+      name: order.coalescedName,
+      locationId: order.locationId,
+      licensePlate: (vr && vr.data && vr.data.licensePlate) || null
     });
   }).catch(function() {
     res.status(502).json({ error: "upstream" });
