@@ -20,6 +20,11 @@ var PORT = process.env.PORT || 3000;
 // Override with the CHECKIN_TOKEN env var if it ever needs rotating.
 var CHECKIN_TOKEN = (process.env.CHECKIN_TOKEN || "mt-checkin-7f3a").trim();
 
+// Optional device-access PIN. Set CHECKIN_PIN in Railway to require a one-time PIN
+// per device (remembered client-side) before the form loads AND on every /checkin.
+// Empty = gate disabled (form behaves exactly as before).
+var CHECKIN_PIN = (process.env.CHECKIN_PIN || "").trim();
+
 // Server-authoritative declaration text. The client displays a copy, but THIS
 // is what gets recorded — the client cannot alter the recorded declaration.
 var DECLARATION =
@@ -262,6 +267,19 @@ function checkinLimiter(req, res, next) {
   next();
 }
 
+// Tighter limiter for PIN attempts (brute-force guard): 12 / hour / IP.
+var ulHits = new Map();
+function unlockLimiter(req, res, next) {
+  var ip = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "?").split(",")[0].trim();
+  var now = Date.now();
+  var hits = (ulHits.get(ip) || []).filter(function(t) { return now - t < RL_WINDOW_MS; });
+  if (hits.length >= 12) return res.status(429).json({ error: "Too many attempts \u2014 please try again later." });
+  hits.push(now);
+  ulHits.set(ip, hits);
+  if (ulHits.size > 5000) { var c = now - RL_WINDOW_MS; ulHits.forEach(function(v, k) { if (!v.length || v[v.length - 1] < c) ulHits.delete(k); }); }
+  next();
+}
+
 // --- Routes -----------------------------------------------------------------
 var INDEX_PATH = fs.existsSync(path.join(__dirname, "index.html"))
   ? path.join(__dirname, "index.html")
@@ -326,9 +344,25 @@ app.get("/locations", function(req, res) {
   });
 });
 
+// Public: does this deployment require a device-access PIN? (boolean only \u2014 never the PIN itself)
+app.get("/config", function(req, res) {
+  res.json({ pinRequired: !!CHECKIN_PIN });
+});
+
+// Verify a device-access PIN server-side. The real PIN lives only in CHECKIN_PIN (env), never in the page.
+app.post("/unlock", unlockLimiter, function(req, res) {
+  if (!CHECKIN_PIN) return res.json({ ok: true });                       // gate disabled
+  var pin = ((req.body && req.body.pin) || "").toString().trim();
+  if (pin && pin === CHECKIN_PIN) return res.json({ ok: true });
+  return res.status(401).json({ error: "Incorrect PIN" });
+});
+
 app.post("/checkin", checkinLimiter, function(req, res) {
   if ((req.headers["x-checkin-token"] || "") !== CHECKIN_TOKEN) {
     return res.status(403).json({ error: "Unauthorized" });
+  }
+  if (CHECKIN_PIN && (req.headers["x-checkin-pin"] || "").toString().trim() !== CHECKIN_PIN) {
+    return res.status(401).json({ error: "This device is not authorized. Please enter the access PIN." });
   }
   var b = req.body || {};
   var isFleet = b.customerType === "fleet";
