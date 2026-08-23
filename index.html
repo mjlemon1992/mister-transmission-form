@@ -554,8 +554,13 @@ document.addEventListener("input", function(e) {
     var d = new Date(); var h = d.getHours() + d.getMinutes() / 60;
     return OPEN <= CLOSE ? (h >= OPEN && h < CLOSE) : (h >= OPEN || h < CLOSE);
   }
+  var wasClosed = !within();   // remember overnight-closed state so we can refresh on reopen
   function apply() {
-    if (within()) { bypass = false; ah.style.display = "none"; pb.style.display = "none"; pi.value = ""; return; }
+    var open = within();
+    // Reopening after being closed (e.g. 6am) -> reload for a fresh form + latest deploy.
+    if (open && wasClosed) { location.reload(); return; }
+    wasClosed = !open;
+    if (open) { bypass = false; ah.style.display = "none"; pb.style.display = "none"; pi.value = ""; return; }
     if (bypass) { ah.style.display = "none"; return; }
     ah.style.display = "block";
   }
