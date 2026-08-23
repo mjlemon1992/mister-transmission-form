@@ -210,7 +210,7 @@
         </select>
       </div>
       <div class="field" id="f-source">
-        <label for="source">How did you hear about us? *</label>
+        <label for="source">How did you hear about us?</label>
         <select id="source">
           <option value="">Select an option</option>
           <option value="google">Google search</option>
@@ -226,17 +226,15 @@
       </div>
     </div>
 
-    <div class="notice-box">
-      <p>The information provided above will be used for two-way communication by either phone, email or text message.</p>
-    </div>
-
     <div class="declaration-box">
       <h3>Customer Declaration</h3>
+      <p style="font-size:12px;color:#999;margin:-4px 0 12px;">Almost done — please read and sign below.</p>
       <ul>
         <li>The vehicle has valid insurance and registration.</li>
         <li>Any fines linked to no insurance, registration, or illegal modifications will be passed on to the customer.</li>
         <li>Any vehicle left more than 5 days after completion will be charged $20 per day plus tax, unless otherwise authorized by us.</li>
       </ul>
+      <p style="font-size:12px;color:#888;line-height:1.6;margin:14px 0 0;">Your details will be used for two-way communication by phone, email, or text about your vehicle.</p>
       <p class="sig-label">Please sign below to confirm you have read and agree to the above *</p>
       <div class="sig-wrap" id="f-signature" style="position:relative;">
         <canvas id="sig-pad" class="sig-pad"></canvas>
@@ -255,7 +253,7 @@
     <div id="status-bar" class="status-bar"></div>
 
     <div class="submit-row">
-      <button class="btn-clear" onclick="clearForm()">Clear form</button>
+      <button class="btn-clear" onclick="confirmClear()">Clear form</button>
       <button class="btn-submit" id="submit-btn" onclick="submitForm()">Submit</button>
     </div>
   </div>
@@ -391,7 +389,6 @@ function validate() {
   check("f-year", "year", validYear);
   check("f-make", "make", notEmpty);
   check("f-model", "model", notEmpty);
-  check("f-source", "source", selected);
 
   if (!sigHasInk) { var sw = document.getElementById("f-signature"); sw.classList.add("invalid"); ok = false; if (!firstBad) firstBad = sw; }
   else { document.getElementById("f-signature").classList.remove("invalid"); }
@@ -473,6 +470,8 @@ function submitForm() {
   };
   xhr.send(JSON.stringify(payload));
 }
+
+function confirmClear() { if (window.confirm("Clear all the information entered so far?")) clearForm(); }
 
 function clearForm() {
   ["firstname","lastname","companyname","firstname-fleet","lastname-fleet",
