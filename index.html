@@ -550,7 +550,8 @@ document.addEventListener("input", function(e) {
 
 <div id="afterhours" style="position:fixed;inset:0;background:#000;z-index:2147483647;display:none;-webkit-tap-highlight-color:transparent;">
   <div id="ah-pin" style="position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;">
-    <input id="ah-pin-input" type="tel" inputmode="numeric" maxlength="4" placeholder="PIN" autocomplete="off" style="font-size:28px;letter-spacing:12px;text-align:center;width:210px;padding:14px;border-radius:12px;border:1px solid #333;background:#111;color:#fff;outline:none;">
+    <input id="ah-pin-input" type="tel" inputmode="numeric" maxlength="8" placeholder="PIN" autocomplete="off" style="font-size:28px;letter-spacing:12px;text-align:center;width:210px;padding:14px;border-radius:12px;border:1px solid #333;background:#111;color:#fff;outline:none;">
+    <button id="ah-pin-btn" style="background:#E07020;border:none;border-radius:10px;padding:0 28px;height:46px;font-size:15px;font-weight:600;color:#fff;cursor:pointer;">Reopen</button>
     <div style="color:#555;font-size:12px;">Staff PIN to reopen</div>
   </div>
 </div>
@@ -587,10 +588,28 @@ document.addEventListener("input", function(e) {
   ah.addEventListener("touchcancel", release);
   ah.addEventListener("mousedown", press);
   ah.addEventListener("mouseup", release);
-  pi.addEventListener("input", function() {
-    if (pi.value === PIN) { bypass = true; pb.style.display = "none"; pi.value = ""; apply(); }
-    else if (pi.value.length >= 4) { pi.value = ""; }
-  });
+  function ahVerify() {
+    var val = (pi.value || "").trim();
+    if (val.length < 4) return;
+    if (window.__pinRequired) {
+      // Same PIN as device access, verified server-side. Also unlocks this device.
+      var x = new XMLHttpRequest();
+      x.open("POST", BACKEND + "/unlock", true);
+      x.setRequestHeader("Content-Type", "application/json");
+      x.onload = function() {
+        if (x.status === 200) { if (window.__setPin) window.__setPin(val); bypass = true; pb.style.display = "none"; pi.value = ""; apply(); }
+        else { pi.value = ""; }
+      };
+      x.onerror = function() { pi.value = ""; };
+      x.send(JSON.stringify({ pin: val }));
+    } else {
+      if (val === PIN) { bypass = true; pb.style.display = "none"; pi.value = ""; apply(); }
+      else { pi.value = ""; }
+    }
+  }
+  pi.addEventListener("keydown", function(e) { if (e.key === "Enter") ahVerify(); });
+  var ahBtn = document.getElementById("ah-pin-btn");
+  if (ahBtn) ahBtn.addEventListener("click", ahVerify);
   apply();
   setInterval(apply, 15000);
   document.addEventListener("visibilitychange", function() { if (!document.hidden) apply(); });
@@ -608,6 +627,7 @@ document.addEventListener("input", function(e) {
   function hide(){ GATE.style.display = "none"; ERR.textContent = ""; INP.value = ""; }
   window.__getPin = function(){ try { return localStorage.getItem(KEY) || ""; } catch(e){ return ""; } };
   window.__relock = function(){ try { localStorage.removeItem(KEY); } catch(e){} show(); };
+  window.__setPin = function(p){ try { localStorage.setItem(KEY, p); } catch(e){} };
   function verify(){
     var pin = (INP.value || "").trim();
     if (pin.length < 4) { ERR.textContent = "Enter the PIN."; return; }
@@ -629,7 +649,7 @@ document.addEventListener("input", function(e) {
   // Ask the server whether a PIN is required for this deployment.
   var c = new XMLHttpRequest();
   c.open("GET", BACKEND + "/config", true);
-  c.onload = function(){ try { var cfg = JSON.parse(c.responseText); if (cfg.pinRequired && !window.__getPin()) show(); } catch(e){} };
+  c.onload = function(){ try { var cfg = JSON.parse(c.responseText); window.__pinRequired = !!cfg.pinRequired; if (cfg.pinRequired && !window.__getPin()) show(); } catch(e){} };
   c.send();
 })();
 </script>
