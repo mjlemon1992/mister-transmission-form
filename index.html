@@ -489,7 +489,7 @@ function resetForm() {
 <script>
 (function(){
   var q = new URLSearchParams(location.search);
-  var OPEN = parseFloat(q.get("open"));  if (isNaN(OPEN))  OPEN = 8;    // 8:00am
+  var OPEN = parseFloat(q.get("open"));  if (isNaN(OPEN))  OPEN = 6;    // 6:00am
   var CLOSE = parseFloat(q.get("close")); if (isNaN(CLOSE)) CLOSE = 19;  // 7:00pm
   var PIN = (q.get("pin") || "2468");
   var ah = document.getElementById("afterhours");
