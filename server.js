@@ -203,7 +203,7 @@ function attachDeclaration(orderId, customerId, b, isFleet) {
     "Date: " + now.toISOString() +
     " (" + now.toLocaleString("en-CA", { timeZone: "America/Edmonton" }) + " MT)\n\n" +
     DECLARATION +
-    "\n\nSignature captured on the check-in form: " + (b.signature ? "YES (image stored in the next internal note)" : "NO");
+    "\n\nSigned on the check-in screen: " + (b.signature ? "YES" : "NO");
   return smRequest("POST", "/message", {
     customerId: customerId,
     orderId: orderId,
@@ -213,27 +213,6 @@ function attachDeclaration(orderId, customerId, b, isFleet) {
     sendSms: false,
     contentType: "PlainText"
   }, b.__locKey);
-}
-
-// Shopmonkey's API has no file-upload endpoint, so the signature image is
-// persisted as a data URL inside a second internal note on the order.
-// To view it: copy the data:image/png... line into a browser address bar.
-function storeSignature(orderId, customerId, sig, apiKey) {
-  if (!orderId || !customerId) return Promise.resolve();
-  if (!sig || sig.indexOf("data:image/png;base64,") !== 0) return Promise.resolve();
-  if (sig.length > 400000) {
-    console.error("storeSignature: image too large (" + sig.length + " chars), skipping");
-    return Promise.resolve();
-  }
-  return smRequest("POST", "/message", {
-    customerId: customerId,
-    orderId: orderId,
-    text: "SIGNATURE IMAGE (check-in declaration). To view: copy the entire line below into a browser address bar.\n\n" + sig,
-    internal: true,
-    sendEmail: false,
-    sendSms: false,
-    contentType: "PlainText"
-  }, apiKey);
 }
 
 // --- Idempotency: same person+vehicle within 10 min returns the same order --
@@ -369,10 +348,6 @@ app.post("/checkin", checkinLimiter, function(req, res) {
   if ((req.headers["x-checkin-token"] || "") !== CHECKIN_TOKEN) {
     return res.status(403).json({ error: "Unauthorized" });
   }
-  var reqPin = pinForLoc(req.body && req.body.location);
-  if (reqPin && (req.headers["x-checkin-pin"] || "").toString().trim() !== reqPin) {
-    return res.status(401).json({ error: "This device is not authorized. Please enter the access PIN." });
-  }
   var b = req.body || {};
   var isFleet = b.customerType === "fleet";
 
@@ -442,7 +417,6 @@ app.post("/checkin", checkinLimiter, function(req, res) {
     // Record declaration + signature after responding, so a failure here can
     // never block the customer's check-in.
     attachDeclaration(orderId, customerId, b, isFleet)
-      .then(function() { return storeSignature(orderId, customerId, b.signature, b.__locKey); })
       .catch(function(e) {
         console.error("declaration/signature recording failed for order " + orderId + ":", e && e.message);
       });
